@@ -144,6 +144,17 @@
     transition:border-color .15s;
   }
   input:focus,select:focus{outline:none;border-color:var(--gold-500);background:#fff;}
+  .checkbox-group{display:flex;flex-wrap:wrap;gap:8px;}
+  .checkbox-chip{
+    display:inline-flex;align-items:center;gap:7px;
+    border:1.5px solid var(--line);border-radius:999px;
+    padding:7px 13px;font-size:13px;font-weight:500;color:var(--ink-700);
+    cursor:pointer;background:#FCFBF7;transition:all .15s;
+    user-select:none;
+  }
+  .checkbox-chip:hover{border-color:var(--olive-500);}
+  .checkbox-chip input{width:15px;height:15px;accent-color:var(--gold-600);cursor:pointer;margin:0;padding:0;border:none;}
+  .checkbox-chip.checked{background:var(--olive-800);border-color:var(--olive-800);color:#F7F5E9;}
   .btn{
     border:none;border-radius:7px;padding:10px 18px;font-weight:600;font-size:13.5px;
     cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:7px;
@@ -343,9 +354,9 @@
             <label>Qty (Pcs)</label>
             <input type="number" id="fQty" min="1" value="1" required>
           </div>
-          <div class="field">
-            <label>Penjahit Ditugaskan</label>
-            <select id="fTailor" required></select>
+          <div class="field full">
+            <label>Penjahit Ditugaskan (boleh pilih lebih dari satu — mereka akan mengerjakan order ini secara paralel)</label>
+            <div id="fTailorGroup" class="checkbox-group"></div>
           </div>
           <div class="field">
             <label>Mulai Pengerjaan</label>
@@ -370,9 +381,9 @@
         </div>
         <div style="margin-top:16px;font-size:12px;color:var(--ink-500);line-height:1.7;">
           <strong>Rumus perhitungan:</strong><br>
-          Total Jam Pengerjaan = (Qty × Rata-rata Waktu/Pcs) ÷ 60<br>
-          Hari Kerja Dibutuhkan = Total Jam ÷ Jam Kerja Efektif Penjahit<br>
-          Estimasi Selesai = Waktu Mulai + Hari Kerja (jam kerja 08:00–selesai per hari, Minggu libur)
+          Total Man-Jam = (Qty × Rata-rata Waktu/Pcs) ÷ 60<br>
+          Jika lebih dari satu penjahit ditugaskan, mereka mengerjakan order ini secara <em>paralel</em> — total man-jam dibagi jumlah penjahit, sehingga selesai lebih cepat.<br>
+          Jam kerja: Senin–Kamis 09:00–18:00 (istirahat 12:00–13:00), Jumat 09:00–18:00 (istirahat 11:30–13:30), Sabtu 09:00–17:00 (istirahat 12:00–13:00), Minggu libur.
         </div>
       </div>
     </div>
@@ -566,11 +577,23 @@
   };
 
   const TODAY = new Date(2026,7,10, 9,30); // 10 Agustus 2026, dijadikan "sekarang" untuk konsistensi demo
-  const WORK_START_HOUR = 8;
-  // Jam kerja efektif per hari berlaku sama untuk semua penjahit
-  // (field ini sebelumnya bisa diatur per-penjahit, sekarang jadi
-  // satu standar perusahaan supaya form Master Penjahit lebih ringkas).
-  const DEFAULT_DAILY_HOURS = 8;
+
+  /* ============================================================
+     JAM KERJA PERUSAHAAN
+     Senin–Kamis : 09:00–18:00, istirahat 12:00–13:00
+     Jumat       : 09:00–18:00, istirahat 11:30–13:30
+     Sabtu       : 09:00–17:00, istirahat 12:00–13:00
+     Minggu      : libur
+  ============================================================ */
+  function getWorkWindows(d){
+    const day = d.getDay(); // 0=Minggu ... 6=Sabtu
+    const y=d.getFullYear(), m=d.getMonth(), dt=d.getDate();
+    const at=(h,mi)=>new Date(y,m,dt,h,mi,0,0);
+    if(day===0) return []; // Minggu libur
+    if(day===6) return [[at(9,0), at(12,0)], [at(13,0), at(17,0)]]; // Sabtu, istirahat 12:00-13:00
+    if(day===5) return [[at(9,0), at(11,30)], [at(13,30), at(18,0)]]; // Jumat
+    return [[at(9,0), at(12,0)], [at(13,0), at(18,0)]]; // Senin–Kamis
+  }
 
   /* ============================================================
      HELPERS
@@ -581,68 +604,83 @@
   function fmtCurrency(n){ return 'Rp' + Math.round(n).toLocaleString('id-ID'); }
   function toInputDate(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
   function toInputDateTime(d){ return `${toInputDate(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
-  function isSunday(d){ return d.getDay() === 0; }
   function findTailor(id){ return state.tailors.find(t=>t.id===id); }
   function findProduct(code){ return state.products.find(p=>p.code===code); }
+  function tailorNames(ids){
+    const list = (ids||[]).map(id=>{ const t=findTailor(id); return t ? t.name : null; }).filter(Boolean);
+    return list.length ? list.join(', ') : '—';
+  }
 
   /* ============================================================
      CORE ESTIMATION LOGIC
-     Total Jam = (Qty x AvgMinutes)/60
-     Hari kerja = Total Jam / JamKerjaEfektif
-     Estimasi Selesai = start + hari kerja, memperhitungkan jam kerja
-     harian (08:00 -> 08:00+jamKerjaEfektif) & melompati hari Minggu.
+     Total Man-Menit = Qty x AvgMinutes
+     Beberapa penjahit yang ditugaskan bekerja PARALEL pada order yang
+     sama, sehingga total pekerjaan terbagi di antara mereka sekaligus
+     (bukan dikerjakan satu-satu bergiliran). Estimasi selesai dihitung
+     dengan "mengonsumsi" jendela jam kerja perusahaan (lihat
+     getWorkWindows), melompati jam istirahat, hari Minggu, dan
+     menyesuaikan jam kerja khusus Jumat & Sabtu.
   ============================================================ */
   function calcTotalHours(qty, avgMinutes){
     return (qty * avgMinutes) / 60;
   }
 
-  function estimateCompletion(startDateTime, qty, avgMinutes, dailyEffectiveHours){
+  function estimateCompletion(startDateTime, qty, avgMinutes, numTailors){
+    numTailors = Math.max(1, numTailors || 1);
     const totalHours = calcTotalHours(qty, avgMinutes);
-    let remainingMin = totalHours * 60;
+    let remainingWorkMin = totalHours * 60; // total man-menit yang harus diselesaikan
     let current = new Date(startDateTime);
-    const workEndHour = WORK_START_HOUR + dailyEffectiveHours;
 
-    function skipToNextWorkStart(d){
-      d.setHours(WORK_START_HOUR,0,0,0);
-      while(isSunday(d)){ d.setDate(d.getDate()+1); }
+    function startOfNextDay(d){
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate()+1, 0,0,0,0);
     }
-    function dayWorkEnd(d){
-      const e = new Date(d); e.setHours(workEndHour,0,0,0); return e;
-    }
-    function dayWorkStart(d){
-      const s = new Date(d); s.setHours(WORK_START_HOUR,0,0,0); return s;
+    // majukan `d` ke titik awal jendela kerja terdekat yang belum lewat
+    function snapForward(d){
+      let safety = 0;
+      while(safety++ < 400){
+        const wins = getWorkWindows(d);
+        if(wins.length){
+          const lastEnd = wins[wins.length-1][1];
+          if(d < lastEnd){
+            for(const [ws,we] of wins){ if(d < we) return d < ws ? new Date(ws) : d; }
+          }
+        }
+        d = startOfNextDay(d);
+      }
+      return d;
     }
 
-    // normalisasi posisi awal ke dalam jendela kerja
-    while(isSunday(current)){ current.setDate(current.getDate()+1); current.setHours(WORK_START_HOUR,0,0,0); }
-    let ws = dayWorkStart(current);
-    let we = dayWorkEnd(current);
-    if(current < ws) current = new Date(ws);
-    if(current >= we){
-      current.setDate(current.getDate()+1);
-      skipToNextWorkStart(current);
-    }
+    current = snapForward(current);
 
     let guard = 0;
-    while(remainingMin > 1e-6 && guard < 10000){
+    while(remainingWorkMin > 1e-6 && guard < 20000){
       guard++;
-      we = dayWorkEnd(current);
-      const availableTodayMin = (we - current) / 60000;
-      if(availableTodayMin <= 0){
-        current.setDate(current.getDate()+1);
-        skipToNextWorkStart(current);
-        continue;
+      const wins = getWorkWindows(current);
+      let consumed = false;
+      for(const [ws,we] of wins){
+        if(current >= we) continue;
+        if(current < ws) current = new Date(ws);
+        const wallAvailMin = (we - current) / 60000;
+        if(wallAvailMin <= 0) continue;
+        const capacityMin = wallAvailMin * numTailors; // total man-menit yang bisa dikerjakan di jendela ini
+        if(remainingWorkMin <= capacityMin){
+          const wallNeeded = remainingWorkMin / numTailors;
+          current = new Date(current.getTime() + wallNeeded*60000);
+          remainingWorkMin = 0;
+          consumed = true;
+          break;
+        } else {
+          remainingWorkMin -= capacityMin;
+          current = new Date(we);
+          consumed = true;
+        }
       }
-      if(remainingMin <= availableTodayMin){
-        current = new Date(current.getTime() + remainingMin*60000);
-        remainingMin = 0;
-      } else {
-        remainingMin -= availableTodayMin;
-        current.setDate(current.getDate()+1);
-        skipToNextWorkStart(current);
+      if(remainingWorkMin <= 1e-6) break;
+      if(!consumed || getWorkWindows(current).length === 0){
+        current = snapForward(startOfNextDay(current));
       }
     }
-    return { completion: current, totalHours, workDaysNeeded: totalHours / dailyEffectiveHours };
+    return { completion: current, totalHours, hoursPerTailor: totalHours / numTailors };
   }
 
   function computeStatus(order){
@@ -680,14 +718,14 @@
       const tailor = findTailor(r.tailor);
       const orderDate = new Date(...r.order);
       const startDateTime = new Date(...r.start);
-      const est = estimateCompletion(startDateTime, r.qty, product.avgMinutes, DEFAULT_DAILY_HOURS);
+      const est = estimateCompletion(startDateTime, r.qty, product.avgMinutes, 1);
       const actualCompletion = r.actual ? new Date(...r.actual) : null;
       return {
         id: 'ORD-' + String(idx+1).padStart(4,'0'),
         customer: r.customer,
         productCode: product.code,
         qty: r.qty,
-        tailorId: tailor.id,
+        tailorIds: [tailor.id],
         orderDate, startDateTime,
         estimatedCompletion: est.completion,
         totalHours: est.totalHours,
@@ -813,9 +851,12 @@
     const totalQtyProd = active.reduce((s,o)=>s+o.qty,0);
 
     // penjahit paling produktif = total qty pcs selesai (completed)
+    // setiap penjahit yang ikut mengerjakan order dikreditkan qty penuh
     const prodByTailor = {};
     orders.filter(o=>o.status==='Completed').forEach(o=>{
-      prodByTailor[o.tailorId] = (prodByTailor[o.tailorId]||0) + o.qty;
+      (o.tailorIds||[]).forEach(tid=>{
+        prodByTailor[tid] = (prodByTailor[tid]||0) + o.qty;
+      });
     });
     let topTailorId = Object.keys(prodByTailor).sort((a,b)=>prodByTailor[b]-prodByTailor[a])[0];
     const topTailor = topTailorId ? findTailor(topTailorId) : null;
@@ -842,13 +883,12 @@
     const recent = [...orders].sort((a,b)=>b.orderDate-a.orderDate).slice(0,6);
     document.querySelector('#recentOrderTable tbody').innerHTML = recent.map(o=>{
       const product = findProduct(o.productCode);
-      const tailor = findTailor(o.tailorId);
       return `<tr>
         <td class="mono cell-strong">${o.id}</td>
         <td>${o.customer}</td>
         <td>${product.name}</td>
         <td class="mono">${o.qty}</td>
-        <td>${tailor.name}</td>
+        <td>${tailorNames(o.tailorIds)}</td>
         <td class="mono">${fmtDateTime(o.estimatedCompletion)}</td>
         <td>${statusBadge(o.status)}</td>
       </tr>`;
@@ -904,27 +944,40 @@
   const fOrderDate = document.getElementById('fOrderDate');
   const fProduct = document.getElementById('fProduct');
   const fQty = document.getElementById('fQty');
-  const fTailor = document.getElementById('fTailor');
+  const fTailorGroup = document.getElementById('fTailorGroup');
   const fStart = document.getElementById('fStart');
   const fNote = document.getElementById('fNote');
   const estimateBox = document.getElementById('estimateBox');
 
+  function getSelectedTailorIds(){
+    return Array.from(fTailorGroup.querySelectorAll('input:checked')).map(cb=>cb.value);
+  }
+
   function populateFormSelects(){
     fProduct.innerHTML = state.products.map(p=>`<option value="${p.code}">${p.name}</option>`).join('');
-    fTailor.innerHTML = state.tailors
-      .map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
+    fTailorGroup.innerHTML = state.tailors.map(t=>`
+      <label class="checkbox-chip">
+        <input type="checkbox" value="${t.id}">
+        <span>${t.name}</span>
+      </label>`).join('');
   }
   populateFormSelects();
   fOrderDate.value = toInputDate(TODAY);
   fStart.value = toInputDateTime(TODAY);
 
+  fTailorGroup.addEventListener('change', (e)=>{
+    const chip = e.target.closest('.checkbox-chip');
+    if(chip) chip.classList.toggle('checked', e.target.checked);
+    updateLivePreview();
+  });
+
   function updateLivePreview(){
     const product = findProduct(fProduct.value);
-    const tailor = findTailor(fTailor.value);
+    const tailorIds = getSelectedTailorIds();
     const qty = parseInt(fQty.value,10) || 0;
     const startVal = fStart.value;
 
-    if(!product || !tailor || !qty || !startVal){
+    if(!product || !tailorIds.length || !qty || !startVal){
       estimateBox.classList.add('empty');
       estimateBox.querySelector('.big').textContent = 'Lengkapi produk, qty, penjahit & waktu mulai';
       const meta = estimateBox.querySelector('.meta');
@@ -933,7 +986,7 @@
     }
     estimateBox.classList.remove('empty');
     const start = new Date(startVal);
-    const est = estimateCompletion(start, qty, product.avgMinutes, DEFAULT_DAILY_HOURS);
+    const est = estimateCompletion(start, qty, product.avgMinutes, tailorIds.length);
 
     estimateBox.querySelector('.big').textContent = fmtDateTime(est.completion);
     let meta = estimateBox.querySelector('.meta');
@@ -943,13 +996,13 @@
       estimateBox.appendChild(meta);
     }
     meta.innerHTML = `
-      <div><span class="k">Total Jam Kerja</span><span class="v">${est.totalHours.toFixed(1)} jam</span></div>
-      <div><span class="k">Hari Kerja Dibutuhkan</span><span class="v">${est.workDaysNeeded.toFixed(2)} hari</span></div>
-      <div><span class="k">Penjahit</span><span class="v">${tailor.name}</span></div>
+      <div><span class="k">Total Man-Jam</span><span class="v">${est.totalHours.toFixed(1)} jam</span></div>
+      <div><span class="k">Jam per Penjahit</span><span class="v">${est.hoursPerTailor.toFixed(1)} jam</span></div>
+      <div><span class="k">Penjahit (${tailorIds.length})</span><span class="v">${tailorNames(tailorIds)}</span></div>
     `;
   }
   ['input','change'].forEach(evt=>{
-    [fProduct,fQty,fTailor,fStart].forEach(el=>el.addEventListener(evt, updateLivePreview));
+    [fProduct,fQty,fStart].forEach(el=>el.addEventListener(evt, updateLivePreview));
   });
   updateLivePreview();
 
@@ -962,18 +1015,22 @@
       fOrderId.focus();
       return;
     }
+    const tailorIds = getSelectedTailorIds();
+    if(!tailorIds.length){
+      alert('Pilih minimal satu penjahit untuk order ini.');
+      return;
+    }
     const product = findProduct(fProduct.value);
-    const tailor = findTailor(fTailor.value);
     const qty = parseInt(fQty.value,10);
     const start = new Date(fStart.value);
     const orderDate = new Date(fOrderDate.value + 'T00:00:00');
 
-    const est = estimateCompletion(start, qty, product.avgMinutes, DEFAULT_DAILY_HOURS);
+    const est = estimateCompletion(start, qty, product.avgMinutes, tailorIds.length);
     const newOrder = {
       id: orderId,
       customer: fCustomer.value.trim(),
       productCode: product.code,
-      qty, tailorId: tailor.id,
+      qty, tailorIds,
       orderDate, startDateTime: start,
       estimatedCompletion: est.completion,
       totalHours: est.totalHours,
@@ -983,13 +1040,14 @@
     };
     state.orders.unshift(newOrder);
     e.target.reset();
+    fTailorGroup.querySelectorAll('.checkbox-chip').forEach(c=>c.classList.remove('checked'));
     fOrderDate.value = toInputDate(TODAY);
     fStart.value = toInputDateTime(TODAY);
     updateLivePreview();
     populateFilterSelects();
     renderOrderTable();
     persist();
-    alert(`Order ${newOrder.id} berhasil disimpan.\nEstimasi selesai: ${fmtDateTime(est.completion)}`);
+    alert(`Order ${newOrder.id} berhasil disimpan.\nDikerjakan oleh: ${tailorNames(tailorIds)}\nEstimasi selesai: ${fmtDateTime(est.completion)}`);
   });
 
   /* ============================================================
@@ -1010,7 +1068,7 @@
     return state.orders
       .map(o=>({...o, status: computeStatus(o)}))
       .filter(o=>{
-        if(filterTailor.value && o.tailorId !== filterTailor.value) return false;
+        if(filterTailor.value && !(o.tailorIds||[]).includes(filterTailor.value)) return false;
         if(filterStatus.value && o.status !== filterStatus.value) return false;
         if(filterFrom.value && o.orderDate < new Date(filterFrom.value+'T00:00:00')) return false;
         if(filterTo.value && o.orderDate > new Date(filterTo.value+'T23:59:59')) return false;
@@ -1040,14 +1098,13 @@
     }
     tbody.innerHTML = rows.map(o=>{
       const product = findProduct(o.productCode);
-      const tailor = findTailor(o.tailorId);
       return `<tr>
         <td class="mono cell-strong">${o.id}</td>
         <td class="mono">${fmtDate(o.orderDate)}</td>
         <td>${o.customer}</td>
         <td>${product.name}</td>
         <td class="mono">${o.qty}</td>
-        <td>${tailor.name}</td>
+        <td>${tailorNames(o.tailorIds)}</td>
         <td class="mono">${fmtDateTime(o.startDateTime)}</td>
         <td class="mono">${fmtDateTime(o.estimatedCompletion)}</td>
         <td>${statusSelect(o)}</td>
@@ -1104,10 +1161,9 @@
     const lines = [header.join(';')];
     rows.forEach(o=>{
       const product = findProduct(o.productCode);
-      const tailor = findTailor(o.tailorId);
       lines.push([
         o.id, fmtDate(o.orderDate), csvSafe(o.customer), csvSafe(product.name),
-        o.qty, csvSafe(tailor.name), fmtDateTime(o.startDateTime), fmtDateTime(o.estimatedCompletion), statusLabel(o.status)
+        o.qty, csvSafe(tailorNames(o.tailorIds)), fmtDateTime(o.startDateTime), fmtDateTime(o.estimatedCompletion), statusLabel(o.status)
       ].join(';'));
     });
     const csvContent = '\uFEFF' + lines.join('\r\n');
@@ -1155,7 +1211,7 @@
 
     const byTailor = {};
     state.tailors.forEach(t=>byTailor[t.id]=[]);
-    orders.forEach(o=>{ if(byTailor[o.tailorId]) byTailor[o.tailorId].push(o); });
+    orders.forEach(o=>{ (o.tailorIds||[]).forEach(tid=>{ if(byTailor[tid]) byTailor[tid].push(o); }); });
 
     const body = document.getElementById('timelineBody');
     body.innerHTML = state.tailors.map(t=>{
@@ -1171,7 +1227,7 @@
       return `<div class="tailor-row">
         <div class="tailor-info">
           <div class="name">${t.name}</div>
-          <div class="cap">${activeQty} pcs aktif · ${DEFAULT_DAILY_HOURS} jam/hari</div>
+          <div class="cap">${activeQty} pcs aktif · jam kerja standar perusahaan</div>
         </div>
         <div class="tailor-track">${bars}${todayLine}</div>
       </div>`;
@@ -1355,7 +1411,7 @@
     }
     if(delBtn){
       const id = delBtn.dataset.delTailor;
-      const inUse = state.orders.some(o=>o.tailorId===id);
+      const inUse = state.orders.some(o=>(o.tailorIds||[]).includes(id));
       if(inUse){
         alert('Penjahit ini masih memiliki data order dan tidak bisa dihapus. Hapus/pindahkan order terkait terlebih dahulu.');
         return;
