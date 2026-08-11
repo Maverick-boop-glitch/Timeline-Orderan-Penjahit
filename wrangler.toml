@@ -8,4 +8,4 @@ pages_build_output_dir = "."
 [[d1_databases]]
 binding = "DB"
 database_name = "jahitan-db"
-database_id = "GANTI_DENGAN_DATABASE_ID_ANDA"
+database_id = "bc4c2ae7-d593-4887-9863-26b344d92c10"
