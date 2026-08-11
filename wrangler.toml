@@ -1,0 +1,17 @@
+name = "jahitan-app"
+main = "src/worker.js"
+compatibility_date = "2026-08-01"
+
+# Serves everything in ./public as the frontend (index.html).
+# Requests to /api/state are handled by src/worker.js instead.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# D1 database binding — create this with:
+#   npx wrangler d1 create jahitan-db
+# then paste the returned database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "jahitan-db"
+database_id = "GANTI_DENGAN_DATABASE_ID_ANDA"

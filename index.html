@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jahitan — Sistem Laporan & Estimasi Timeline Order</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --olive-900:#232D18;
+    --olive-800:#2E3A1F;
+    --olive-700:#3F4E29;
+    --olive-500:#5C7238;
+    --olive-200:#D8DFC6;
+    --gold-600:#A9821F;
+    --gold-500:#C9A227;
+    --gold-300:#E4C765;
+    --bg:#F6F5EF;
+    --surface:#FFFFFF;
+    --ink-900:#242619;
+    --ink-700:#454736;
+    --ink-500:#71735E;
+    --line:#E3E0D2;
+    --danger:#AE4A30;
+    --danger-bg:#F7E7E1;
+    --success:#3E6B4F;
+    --success-bg:#E4EEE4;
+    --warning:#8A6A16;
+    --warning-bg:#F5EBCE;
+    --info:#3E5C82;
+    --info-bg:#E4EBF2;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(35,45,24,0.06), 0 4px 16px rgba(35,45,24,0.06);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink-900);
+    font-family:'Work Sans',sans-serif;
+    font-size:14.5px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,h4{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    margin:0;
+    color:var(--olive-900);
+    letter-spacing:-0.01em;
+  }
+  a{color:inherit;}
+  button{font-family:inherit;}
+
+  /* ===== stitch motif ===== */
+  .stitch{
+    border:none;
+    border-top:2px dashed var(--gold-500);
+    opacity:0.55;
+    margin:0;
+  }
+  .stitch-box{
+    border:1.5px dashed var(--olive-200);
+  }
+
+  /* ===== HEADER ===== */
+  header.app-header{
+    background:linear-gradient(135deg,var(--olive-900),var(--olive-700) 70%);
+    color:#F4F2E6;
+    padding:18px 28px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:20px;
+    position:sticky;
+    top:0;
+    z-index:50;
+    box-shadow:0 2px 10px rgba(0,0,0,0.15);
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand svg{flex-shrink:0;}
+  .brand .brand-text h1{color:#F7F5E9;font-size:20px;}
+  .brand .brand-text span{font-size:11.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold-300);font-weight:600;}
+
+  nav.tabs{display:flex;gap:4px;background:rgba(0,0,0,0.18);padding:5px;border-radius:999px;flex-wrap:wrap;}
+  nav.tabs button{
+    background:transparent;border:none;color:#E9E6D6;
+    padding:9px 16px;border-radius:999px;font-size:13.5px;font-weight:500;
+    cursor:pointer;transition:all .15s ease;white-space:nowrap;
+  }
+  nav.tabs button:hover{background:rgba(255,255,255,0.08);}
+  nav.tabs button.active{background:var(--gold-500);color:var(--olive-900);font-weight:600;}
+
+  main{padding:26px 28px 60px;max-width:1360px;margin:0 auto;}
+  section.view{display:none;animation:fadein .25s ease;}
+  section.view.active{display:block;}
+  @keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+  .view-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
+  .view-head h2{font-size:23px;}
+  .view-head p{color:var(--ink-500);font-size:13px;margin-top:4px;}
+
+  /* ===== CARDS / STATS ===== */
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:26px;}
+  .stat-card{
+    background:var(--surface);border-radius:var(--radius);padding:18px 20px;
+    box-shadow:var(--shadow);border-top:3px solid var(--gold-500);
+    position:relative;overflow:hidden;
+  }
+  .stat-card .label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-500);font-weight:600;}
+  .stat-card .value{font-family:'Fraunces',serif;font-size:30px;color:var(--olive-900);margin-top:6px;font-weight:600;}
+  .stat-card .sub{font-size:12.5px;color:var(--ink-500);margin-top:4px;}
+  .stat-card .sub.up{color:var(--success);}
+
+  .grid-2{display:grid;grid-template-columns:1.4fr 1fr;gap:20px;}
+  @media (max-width:1000px){.grid-2{grid-template-columns:1fr;} .stat-grid{grid-template-columns:repeat(2,1fr);}}
+
+  .panel{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;}
+  .panel h3{font-size:16px;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+
+  /* ===== BADGES ===== */
+  .badge{
+    display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;
+    font-size:11.5px;font-weight:600;letter-spacing:.02em;white-space:nowrap;
+  }
+  .badge::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;}
+  .badge.Pending{background:var(--warning-bg);color:var(--warning);}
+  .badge.OnProgress{background:var(--info-bg);color:var(--info);}
+  .badge.Completed{background:var(--success-bg);color:var(--success);}
+  .badge.Delayed{background:var(--danger-bg);color:var(--danger);}
+  .badge.Aktif{background:var(--success-bg);color:var(--success);}
+  .badge.Bertugas{background:var(--info-bg);color:var(--info);}
+  .badge.TidakAktif{background:#eee;color:var(--ink-500);}
+
+  /* ===== FORM ===== */
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field.full{grid-column:1/-1;}
+  label{font-size:12.5px;font-weight:600;color:var(--ink-700);}
+  input,select{
+    border:1.5px solid var(--line);background:#FCFBF7;border-radius:7px;
+    padding:9px 11px;font-size:14px;font-family:inherit;color:var(--ink-900);
+    transition:border-color .15s;
+  }
+  input:focus,select:focus{outline:none;border-color:var(--gold-500);background:#fff;}
+  .btn{
+    border:none;border-radius:7px;padding:10px 18px;font-weight:600;font-size:13.5px;
+    cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:7px;
+  }
+  .btn-primary{background:var(--olive-800);color:#F7F5E9;}
+  .btn-primary:hover{background:var(--olive-900);}
+  .btn-gold{background:var(--gold-500);color:var(--olive-900);}
+  .btn-gold:hover{background:var(--gold-600);color:#fff;}
+  .btn-ghost{background:transparent;border:1.5px solid var(--line);color:var(--ink-700);}
+  .btn-ghost:hover{border-color:var(--olive-500);color:var(--olive-800);}
+  .btn-sm{padding:6px 11px;font-size:12px;}
+
+  /* estimate preview */
+  .estimate-box{
+    margin-top:16px;border-radius:var(--radius);padding:18px 20px;
+    background:repeating-linear-gradient(135deg,var(--olive-800),var(--olive-800) 10px,var(--olive-700) 10px,var(--olive-700) 11px);
+    background-color:var(--olive-800);
+    color:#F7F5E9;position:relative;
+  }
+  .estimate-box .tag{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--gold-300);font-weight:700;}
+  .estimate-box .big{font-family:'Fraunces',serif;font-size:22px;margin-top:6px;}
+  .estimate-box .meta{display:flex;gap:22px;margin-top:12px;flex-wrap:wrap;}
+  .estimate-box .meta div span{display:block;}
+  .estimate-box .meta div .k{font-size:11px;color:#CFC9AC;text-transform:uppercase;letter-spacing:.06em;}
+  .estimate-box .meta div .v{font-size:15px;font-weight:600;margin-top:2px;}
+  .estimate-box.empty{background:var(--olive-500);opacity:0.55;}
+
+  /* ===== TABLE ===== */
+  .filter-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:flex-end;}
+  .filter-bar .field{min-width:150px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{
+    text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--ink-500);padding:10px 12px;border-bottom:2px solid var(--olive-200);
+    background:#FBFAF4;position:sticky;top:0;
+  }
+  tbody td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  tbody tr:hover{background:#FBFAF3;}
+  .mono{font-variant-numeric:tabular-nums;}
+  .cell-strong{font-weight:600;color:var(--olive-900);}
+  .table-wrap{overflow-x:auto;background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);}
+  .table-scroll{max-height:560px;overflow-y:auto;}
+  select.status-select{font-size:12px;padding:5px 8px;border-radius:6px;font-weight:600;border:1.5px solid transparent;cursor:pointer;}
+  select.status-select.Pending{background:var(--warning-bg);color:var(--warning);}
+  select.status-select.OnProgress{background:var(--info-bg);color:var(--info);}
+  select.status-select.Completed{background:var(--success-bg);color:var(--success);}
+  select.status-select.Delayed{background:var(--danger-bg);color:var(--danger);}
+  select.status-select:focus{outline:none;border-color:currentColor;}
+
+  /* ===== TIMELINE / GANTT ===== */
+  .timeline-wrap{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;}
+  .timeline-axis{display:flex;font-size:11px;color:var(--ink-500);margin:0 0 8px 190px;position:relative;height:18px;}
+  .timeline-axis span{position:absolute;transform:translateX(-50%);}
+  .tailor-row{display:flex;align-items:center;gap:0;border-top:1px dashed var(--line);padding:12px 0;}
+  .tailor-row:first-of-type{border-top:none;}
+  .tailor-info{width:190px;flex-shrink:0;padding-right:14px;}
+  .tailor-info .name{font-weight:600;color:var(--olive-900);font-size:13.5px;}
+  .tailor-info .cap{font-size:11.5px;color:var(--ink-500);margin-top:2px;}
+  .tailor-track{flex:1;position:relative;height:40px;background:#F7F6F1;border-radius:6px;overflow:visible;}
+  .order-bar{
+    position:absolute;top:6px;height:28px;border-radius:6px;
+    font-size:11px;color:#fff;display:flex;align-items:center;padding:0 8px;
+    overflow:hidden;white-space:nowrap;cursor:default;box-shadow:0 1px 3px rgba(0,0,0,.15);
+    border:1px solid rgba(255,255,255,.25);
+  }
+  .order-bar.Pending{background:var(--warning);color:#3a2c05;}
+  .order-bar.OnProgress{background:var(--info);}
+  .order-bar.Completed{background:var(--success);}
+  .order-bar.Delayed{background:var(--danger);}
+  .today-line{position:absolute;top:-4px;bottom:-4px;width:0;border-left:2px dashed var(--gold-600);z-index:5;}
+  .today-line::before{content:'⚹';position:absolute;top:-16px;left:-8px;font-size:13px;color:var(--gold-600);}
+  .legend{display:flex;gap:16px;margin-top:16px;font-size:12px;color:var(--ink-700);flex-wrap:wrap;}
+  .legend .lg-item{display:flex;align-items:center;gap:6px;}
+  .legend .lg-dot{width:10px;height:10px;border-radius:3px;}
+
+  /* ===== MASTER DATA ===== */
+  .master-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  @media (max-width:1000px){.master-grid{grid-template-columns:1fr;}}
+
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+
+  footer{text-align:center;padding:26px;color:var(--ink-500);font-size:12px;}
+
+  ::-webkit-scrollbar{height:8px;width:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--olive-200);border-radius:8px;}
+
+  .empty-state{padding:40px 20px;text-align:center;color:var(--ink-500);font-size:13.5px;}
+
+  .hidden{display:none !important;}
+  .icon-btn{
+    border:1.5px solid var(--line);background:#fff;border-radius:6px;
+    width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;
+    cursor:pointer;font-size:13px;color:var(--ink-700);margin-right:4px;
+  }
+  .icon-btn:hover{border-color:var(--olive-500);color:var(--olive-800);}
+  .icon-btn.danger:hover{border-color:var(--danger);color:var(--danger);}
+  .inline-form{
+    margin-top:14px;padding:16px;border-radius:8px;background:#FBFAF4;border:1.5px dashed var(--olive-200);
+  }
+  .inline-form .form-grid{gap:12px 14px;}
+  .storage-note{
+    font-size:11.5px;color:var(--ink-500);display:flex;align-items:center;gap:6px;margin-top:2px;
+  }
+  .storage-note .dot{width:7px;height:7px;border-radius:50%;background:var(--success);flex-shrink:0;}
+  .storage-note.off .dot{background:var(--ink-500);}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <svg width="34" height="34" viewBox="0 0 40 40" fill="none">
+      <circle cx="20" cy="20" r="19" stroke="#E4C765" stroke-width="1.4" stroke-dasharray="2 3"/>
+      <path d="M12 14c3 0 4 3 4 6s-1 6-4 6M28 14c-3 0-4 3-4 6s1 6 4 6" stroke="#F7F5E9" stroke-width="1.6" stroke-linecap="round"/>
+      <circle cx="20" cy="20" r="2.4" fill="#E4C765"/>
+      <path d="M14 20h12" stroke="#E4C765" stroke-width="1.2" stroke-dasharray="1.5 2.2"/>
+    </svg>
+    <div class="brand-text">
+      <h1>Jahitan.</h1>
+      <span>Laporan &amp; Estimasi Timeline Order</span>
+    </div>
+  </div>
+  <nav class="tabs" id="navTabs">
+    <button data-view="dashboard" class="active">Dashboard</button>
+    <button data-view="order-baru">Order Baru</button>
+    <button data-view="data-order">Data Order</button>
+    <button data-view="timeline">Timeline Penjahit</button>
+    <button data-view="master">Master Data</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ================= DASHBOARD ================= -->
+  <section class="view active" id="view-dashboard">
+    <div class="view-head">
+      <div>
+        <h2>Ringkasan Produksi</h2>
+        <p>Ikhtisar performa order &amp; kapasitas penjahit hari ini.</p>
+      </div>
+    </div>
+
+    <div class="stat-grid" id="statGrid"></div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Order Terbaru</h3>
+        <div class="table-wrap" style="box-shadow:none;">
+          <table id="recentOrderTable">
+            <thead><tr>
+              <th>ID Order</th><th>Pelanggan</th><th>Produk</th><th>Qty</th><th>Penjahit</th><th>Estimasi Selesai</th><th>Status</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Penjahit Paling Produktif</h3>
+        <div id="productiveList"></div>
+        <hr class="stitch" style="margin:18px 0;">
+        <h3>Distribusi Status Order</h3>
+        <div id="statusDist"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ORDER BARU ================= -->
+  <section class="view" id="view-order-baru">
+    <div class="view-head">
+      <div>
+        <h2>Input Order Baru</h2>
+        <p>Estimasi tanggal &amp; jam selesai dihitung otomatis begitu qty, produk, dan penjahit ditentukan.</p>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Detail Order</h3>
+        <form id="orderForm" class="form-grid">
+          <div class="field">
+            <label>Nomor Order / ID Transaksi</label>
+            <input type="text" id="fOrderId" placeholder="Contoh: SO-2026-08-001" required>
+          </div>
+          <div class="field">
+            <label>Nama Pelanggan</label>
+            <input type="text" id="fCustomer" placeholder="Contoh: Ibu Ratna / Toko Anggun" required>
+          </div>
+          <div class="field">
+            <label>Tanggal Order Masuk</label>
+            <input type="date" id="fOrderDate" required>
+          </div>
+          <div class="field">
+            <label>Produk</label>
+            <select id="fProduct" required></select>
+          </div>
+          <div class="field">
+            <label>Qty (Pcs)</label>
+            <input type="number" id="fQty" min="1" value="1" required>
+          </div>
+          <div class="field">
+            <label>Penjahit Ditugaskan</label>
+            <select id="fTailor" required></select>
+          </div>
+          <div class="field">
+            <label>Mulai Pengerjaan</label>
+            <input type="datetime-local" id="fStart" required>
+          </div>
+          <div class="field full">
+            <label>Catatan (opsional)</label>
+            <input type="text" id="fNote" placeholder="Contoh: warna navy, bordir nama depan">
+          </div>
+          <div class="field full" style="flex-direction:row;gap:10px;margin-top:6px;">
+            <button type="submit" class="btn btn-primary">Simpan Order</button>
+            <button type="reset" class="btn btn-ghost" id="resetForm">Bersihkan</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h3>Preview Estimasi Live</h3>
+        <div class="estimate-box empty" id="estimateBox">
+          <div class="tag">Estimasi Waktu Selesai</div>
+          <div class="big">Lengkapi produk, qty, penjahit &amp; waktu mulai</div>
+        </div>
+        <div style="margin-top:16px;font-size:12px;color:var(--ink-500);line-height:1.7;">
+          <strong>Rumus perhitungan:</strong><br>
+          Total Jam Pengerjaan = (Qty × Rata-rata Waktu/Pcs) ÷ 60<br>
+          Hari Kerja Dibutuhkan = Total Jam ÷ Jam Kerja Efektif Penjahit<br>
+          Estimasi Selesai = Waktu Mulai + Hari Kerja (jam kerja 08:00–selesai per hari, Minggu libur)
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= DATA ORDER ================= -->
+  <section class="view" id="view-data-order">
+    <div class="view-head">
+      <div>
+        <h2>Tabel Laporan Order</h2>
+        <p>Seluruh data transaksi order, dapat difilter &amp; diekspor.</p>
+      </div>
+    </div>
+
+    <div class="filter-bar panel">
+      <div class="field">
+        <label>Penjahit</label>
+        <select id="filterTailor"><option value="">Semua Penjahit</option></select>
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <select id="filterStatus">
+          <option value="">Semua Status</option>
+          <option value="Pending">Pending</option>
+          <option value="OnProgress">On Progress</option>
+          <option value="Completed">Completed</option>
+          <option value="Delayed">Delayed</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Dari Tanggal Order</label>
+        <input type="date" id="filterFrom">
+      </div>
+      <div class="field">
+        <label>Sampai Tanggal Order</label>
+        <input type="date" id="filterTo">
+      </div>
+      <div class="field">
+        <button class="btn btn-ghost btn-sm" id="clearFilters">Reset Filter</button>
+      </div>
+      <div class="field" style="margin-left:auto;">
+        <button class="btn btn-gold btn-sm" id="exportCsv">⬇ Export CSV</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-scroll">
+      <table id="orderTable">
+        <thead>
+          <tr>
+            <th>ID Order</th><th>Tgl Order</th><th>Pelanggan</th><th>Produk</th>
+            <th>Qty</th><th>Penjahit</th>
+            <th>Mulai</th><th>Estimasi Selesai</th><th>Status</th><th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TIMELINE ================= -->
+  <section class="view" id="view-timeline">
+    <div class="view-head">
+      <div>
+        <h2>Timeline &amp; Kapasitas Penjahit</h2>
+        <p>Peta beban kerja tiap penjahit dari waktu mulai hingga estimasi selesai order.</p>
+      </div>
+    </div>
+    <div class="timeline-wrap">
+      <div class="timeline-axis" id="timelineAxis"></div>
+      <div id="timelineBody"></div>
+      <div class="legend">
+        <div class="lg-item"><span class="lg-dot" style="background:var(--warning);"></span>Pending</div>
+        <div class="lg-item"><span class="lg-dot" style="background:var(--info);"></span>On Progress</div>
+        <div class="lg-item"><span class="lg-dot" style="background:var(--success);"></span>Completed</div>
+        <div class="lg-item"><span class="lg-dot" style="background:var(--danger);"></span>Delayed</div>
+        <div class="lg-item">⚹ &nbsp;Hari ini</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MASTER DATA ================= -->
+  <section class="view" id="view-master">
+    <div class="view-head">
+      <div>
+        <h2>Master Data</h2>
+        <p>Data penjahit dan jenis produk sebagai acuan estimasi &amp; harga. Ubah rata-rata waktu kerja per pcs di sini — perubahan langsung dipakai di semua perhitungan estimasi.</p>
+      </div>
+      <div class="storage-note" id="storageNote"><span class="dot"></span><span id="storageNoteText">Mengecek penyimpanan…</span></div>
+    </div>
+
+    <div class="master-grid">
+      <div class="panel">
+        <div class="toolbar">
+          <h3 style="margin:0;">Master Penjahit</h3>
+          <button class="btn btn-gold btn-sm" id="btnAddTailor">+ Tambah Penjahit</button>
+        </div>
+
+        <div class="inline-form hidden" id="tailorFormWrap">
+          <form id="tailorForm" class="form-grid">
+            <input type="hidden" id="tfEditId">
+            <div class="field full">
+              <label>Nama Penjahit</label>
+              <input type="text" id="tfName" required>
+            </div>
+            <div class="field full" style="flex-direction:row;gap:10px;">
+              <button type="submit" class="btn btn-primary btn-sm" id="tfSubmitBtn">Simpan Penjahit</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="tfCancelBtn">Batal</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="table-wrap" style="box-shadow:none;margin-top:14px;">
+          <table id="tailorTable">
+            <thead><tr><th>ID</th><th>Nama</th><th>Aksi</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="toolbar">
+          <h3 style="margin:0;">Master Produk</h3>
+          <button class="btn btn-gold btn-sm" id="btnAddProduct">+ Tambah Produk</button>
+        </div>
+
+        <div class="inline-form hidden" id="productFormWrap">
+          <form id="productForm" class="form-grid">
+            <input type="hidden" id="pfEditCode">
+            <div class="field full">
+              <label>Nama Produk</label>
+              <input type="text" id="pfName" required>
+            </div>
+            <div class="field">
+              <label>Rata-rata Waktu Kerja / Pcs (menit)</label>
+              <input type="number" id="pfMinutes" min="1" required>
+            </div>
+            <div class="field">
+              <label>Satuan</label>
+              <input type="text" id="pfUnit" value="Pcs" required>
+            </div>
+            <div class="field full" style="flex-direction:row;gap:10px;">
+              <button type="submit" class="btn btn-primary btn-sm" id="pfSubmitBtn">Simpan Produk</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="pfCancelBtn">Batal</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="table-wrap" style="box-shadow:none;margin-top:14px;">
+          <table id="productTable">
+            <thead><tr><th>Nama Produk</th><th>Waktu/Pcs</th><th>Satuan</th><th>Aksi</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>Sistem Laporan &amp; Estimasi Timeline Order Penjahit — data demo, tersimpan hanya selama sesi berjalan.</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================================================
+     STATE / MASTER DATA (dummy)
+  ============================================================ */
+  const state = {
+    tailors: [
+      {id:'T001', name:'Siti Aminah'},
+      {id:'T002', name:'Budi Santoso'},
+      {id:'T003', name:'Rina Wijaya'},
+      {id:'T004', name:'Agus Prasetyo'},
+      {id:'T005', name:'Dewi Lestari'},
+    ],
+    products: [
+      {code:'P-KMJ',  name:'Kemeja Pria Lengan Panjang', avgMinutes:90,  unit:'Pcs'},
+      {code:'P-KMJW', name:'Kemeja Wanita Casual',        avgMinutes:80,  unit:'Pcs'},
+      {code:'P-GAUN', name:'Gaun Pesta',                  avgMinutes:240, unit:'Pcs'},
+      {code:'P-GAUNM',name:'Gaun Muslimah',               avgMinutes:180, unit:'Pcs'},
+      {code:'P-CLN',  name:'Celana Bahan Formal',         avgMinutes:70,  unit:'Pcs'},
+      {code:'P-CLNJ', name:'Celana Jeans Custom',         avgMinutes:100, unit:'Pcs'},
+      {code:'P-JKT',  name:'Jaket Bomber',                avgMinutes:150, unit:'Pcs'},
+      {code:'P-JKTS', name:'Jaket Seragam Sekolah',       avgMinutes:60,  unit:'Pcs'},
+    ],
+    orders: [],
+    nextNum: 1
+  };
+
+  const TODAY = new Date(2026,7,10, 9,30); // 10 Agustus 2026, dijadikan "sekarang" untuk konsistensi demo
+  const WORK_START_HOUR = 8;
+  // Jam kerja efektif per hari berlaku sama untuk semua penjahit
+  // (field ini sebelumnya bisa diatur per-penjahit, sekarang jadi
+  // satu standar perusahaan supaya form Master Penjahit lebih ringkas).
+  const DEFAULT_DAILY_HOURS = 8;
+
+  /* ============================================================
+     HELPERS
+  ============================================================ */
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function fmtDate(d){ return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`; }
+  function fmtDateTime(d){ return `${fmtDate(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+  function fmtCurrency(n){ return 'Rp' + Math.round(n).toLocaleString('id-ID'); }
+  function toInputDate(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+  function toInputDateTime(d){ return `${toInputDate(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+  function isSunday(d){ return d.getDay() === 0; }
+  function findTailor(id){ return state.tailors.find(t=>t.id===id); }
+  function findProduct(code){ return state.products.find(p=>p.code===code); }
+
+  /* ============================================================
+     CORE ESTIMATION LOGIC
+     Total Jam = (Qty x AvgMinutes)/60
+     Hari kerja = Total Jam / JamKerjaEfektif
+     Estimasi Selesai = start + hari kerja, memperhitungkan jam kerja
+     harian (08:00 -> 08:00+jamKerjaEfektif) & melompati hari Minggu.
+  ============================================================ */
+  function calcTotalHours(qty, avgMinutes){
+    return (qty * avgMinutes) / 60;
+  }
+
+  function estimateCompletion(startDateTime, qty, avgMinutes, dailyEffectiveHours){
+    const totalHours = calcTotalHours(qty, avgMinutes);
+    let remainingMin = totalHours * 60;
+    let current = new Date(startDateTime);
+    const workEndHour = WORK_START_HOUR + dailyEffectiveHours;
+
+    function skipToNextWorkStart(d){
+      d.setHours(WORK_START_HOUR,0,0,0);
+      while(isSunday(d)){ d.setDate(d.getDate()+1); }
+    }
+    function dayWorkEnd(d){
+      const e = new Date(d); e.setHours(workEndHour,0,0,0); return e;
+    }
+    function dayWorkStart(d){
+      const s = new Date(d); s.setHours(WORK_START_HOUR,0,0,0); return s;
+    }
+
+    // normalisasi posisi awal ke dalam jendela kerja
+    while(isSunday(current)){ current.setDate(current.getDate()+1); current.setHours(WORK_START_HOUR,0,0,0); }
+    let ws = dayWorkStart(current);
+    let we = dayWorkEnd(current);
+    if(current < ws) current = new Date(ws);
+    if(current >= we){
+      current.setDate(current.getDate()+1);
+      skipToNextWorkStart(current);
+    }
+
+    let guard = 0;
+    while(remainingMin > 1e-6 && guard < 10000){
+      guard++;
+      we = dayWorkEnd(current);
+      const availableTodayMin = (we - current) / 60000;
+      if(availableTodayMin <= 0){
+        current.setDate(current.getDate()+1);
+        skipToNextWorkStart(current);
+        continue;
+      }
+      if(remainingMin <= availableTodayMin){
+        current = new Date(current.getTime() + remainingMin*60000);
+        remainingMin = 0;
+      } else {
+        remainingMin -= availableTodayMin;
+        current.setDate(current.getDate()+1);
+        skipToNextWorkStart(current);
+      }
+    }
+    return { completion: current, totalHours, workDaysNeeded: totalHours / dailyEffectiveHours };
+  }
+
+  function computeStatus(order){
+    if(order.manualStatus) return order.manualStatus;
+    if(order.actualCompletion) return 'Completed';
+    if(TODAY < order.startDateTime) return 'Pending';
+    if(TODAY > order.estimatedCompletion) return 'Delayed';
+    return 'OnProgress';
+  }
+
+  /* ============================================================
+     DUMMY ORDERS
+  ============================================================ */
+  function buildOrders(){
+    const raw = [
+      // id kustomer, produk, qty, tailor, orderDate, startDateTime, actualCompletion(optional, null=belum)
+      {customer:'Toko Anggun Busana', product:'P-KMJ',  qty:25, tailor:'T001', order:[2026,7,1],  start:[2026,7,1,8,0],  actual:[2026,7,5,15,0], note:'Bulk order kemeja seragam kantor'},
+      {customer:'Ibu Ratna',           product:'P-GAUN', qty:2,  tailor:'T003', order:[2026,7,2],  start:[2026,7,2,9,0],  actual:[2026,7,4,12,0], note:'Gaun pesta ulang tahun'},
+      {customer:'Bapak Herman',        product:'P-CLN',  qty:10, tailor:'T002', order:[2026,7,3],  start:[2026,7,3,8,0],  actual:[2026,7,4,17,0], note:null},
+      {customer:'SMA Nusantara 2',     product:'P-JKTS', qty:60, tailor:'T001', order:[2026,7,4],  start:[2026,7,5,8,0],  actual:null, note:'Bulk order jaket almamater'},
+      {customer:'Dewi Boutique',       product:'P-GAUNM',qty:5,  tailor:'T003', order:[2026,7,5],  start:[2026,7,6,8,0],  actual:null, note:null},
+      {customer:'Pak Joko',            product:'P-CLNJ', qty:3,  tailor:'T005', order:[2026,7,5],  start:[2026,7,5,10,0], actual:[2026,7,7,9,0], note:null},
+      {customer:'CV Mitra Jaya',       product:'P-KMJ',  qty:40, tailor:'T002', order:[2026,7,6],  start:[2026,7,6,8,0],  actual:null, note:'Bulk order kemeja korporat — beresiko delay'},
+      {customer:'Ibu Sinta',           product:'P-KMJW', qty:6,  tailor:'T005', order:[2026,7,7],  start:[2026,7,7,8,0],  actual:[2026,7,9,11,0], note:null},
+      {customer:'Klinik Sehat Prima',  product:'P-JKT',  qty:15, tailor:'T003', order:[2026,7,7],  start:[2026,7,8,8,0],  actual:null, note:null},
+      {customer:'Salon Cantika',       product:'P-GAUN', qty:4,  tailor:'T001', order:[2026,7,8],  start:[2026,7,10,8,0], actual:null, note:null},
+      {customer:'Bapak Wibowo',        product:'P-CLN',  qty:2,  tailor:'T005', order:[2026,7,8],  start:[2026,7,9,8,0],  actual:null, note:null},
+      {customer:'Toko Rapi Jaya',      product:'P-KMJ',  qty:18, tailor:'T002', order:[2026,7,9],  start:[2026,7,11,8,0], actual:null, note:null},
+      {customer:'Ibu Melati',          product:'P-GAUNM',qty:1,  tailor:'T003', order:[2026,7,9],  start:[2026,7,12,8,0], actual:null, note:'Custom fitting 2x'},
+      {customer:'Komunitas Motor XR',  product:'P-JKT',  qty:22, tailor:'T005', order:[2026,7,10], start:[2026,7,13,8,0], actual:null, note:'Bulk order jaket komunitas'},
+    ];
+
+    state.orders = raw.map((r,idx)=>{
+      const product = findProduct(r.product);
+      const tailor = findTailor(r.tailor);
+      const orderDate = new Date(...r.order);
+      const startDateTime = new Date(...r.start);
+      const est = estimateCompletion(startDateTime, r.qty, product.avgMinutes, DEFAULT_DAILY_HOURS);
+      const actualCompletion = r.actual ? new Date(...r.actual) : null;
+      return {
+        id: 'ORD-' + String(idx+1).padStart(4,'0'),
+        customer: r.customer,
+        productCode: product.code,
+        qty: r.qty,
+        tailorId: tailor.id,
+        orderDate, startDateTime,
+        estimatedCompletion: est.completion,
+        totalHours: est.totalHours,
+        actualCompletion,
+        manualStatus: null,
+        note: r.note
+      };
+    });
+    state.nextNum = state.orders.length + 1;
+  }
+
+  /* ============================================================
+     PERSISTENCE
+     Memakai backend Cloudflare Pages Functions + D1 (endpoint
+     /api/state) supaya master data & order tersimpan terpusat dan
+     otomatis sinkron ke semua perangkat/staf yang membuka situs
+     ini — bukan cuma di satu browser.
+
+     Cara kerja: seluruh state (tailors, products, orders) dikirim
+     sebagai satu JSON ke server tiap ada perubahan (POST), dan
+     dimuat ulang dari server saat halaman dibuka (GET). Lihat
+     README.md untuk cara membuat & menghubungkan database D1-nya.
+
+     Jika endpoint /api/state belum tersedia (mis. dibuka langsung
+     dari file lokal tanpa `wrangler pages dev`, atau D1 belum
+     dihubungkan), aplikasi tetap jalan normal tapi perubahan hanya
+     bertahan selama tab ini terbuka.
+  ============================================================ */
+  const API_URL = '/api/state';
+  let storageAvailable = false; // ditentukan saat loadPersisted() dipanggil
+
+  function serializeState(){
+    return JSON.stringify({
+      tailors: state.tailors,
+      products: state.products,
+      nextNum: state.nextNum,
+      orders: state.orders.map(o=>({
+        ...o,
+        orderDate: o.orderDate.toISOString(),
+        startDateTime: o.startDateTime.toISOString(),
+        estimatedCompletion: o.estimatedCompletion.toISOString(),
+        actualCompletion: o.actualCompletion ? o.actualCompletion.toISOString() : null
+      }))
+    });
+  }
+
+  async function persist(){
+    if(!storageAvailable) return;
+    try{
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: serializeState()
+      });
+      if(!res.ok) throw new Error('Status ' + res.status);
+    }catch(err){
+      console.warn('Gagal menyimpan data ke server:', err);
+      const noteText = document.getElementById('storageNoteText');
+      const note = document.getElementById('storageNote');
+      if(noteText){ note.classList.add('off'); noteText.textContent = 'Gagal terhubung ke database — perubahan terakhir mungkin belum tersimpan.'; }
+    }
+  }
+
+  async function loadPersisted(){
+    const note = document.getElementById('storageNote');
+    const noteText = document.getElementById('storageNoteText');
+    try{
+      const res = await fetch(API_URL, {method:'GET'});
+      if(!res.ok) throw new Error('Status ' + res.status);
+      const data = await res.json();
+      storageAvailable = true;
+      if(data){
+        state.tailors = data.tailors || state.tailors;
+        state.products = data.products || state.products;
+        state.nextNum = data.nextNum || state.nextNum;
+        if(Array.isArray(data.orders)){
+          state.orders = data.orders.map(o=>({
+            ...o,
+            orderDate: new Date(o.orderDate),
+            startDateTime: new Date(o.startDateTime),
+            estimatedCompletion: new Date(o.estimatedCompletion),
+            actualCompletion: o.actualCompletion ? new Date(o.actualCompletion) : null
+          }));
+        }
+        noteText.textContent = 'Tersambung ke database — data ini dipakai bersama di semua perangkat.';
+      } else {
+        noteText.textContent = 'Tersambung ke database. Belum ada data tersimpan sebelumnya — data awal (dummy) akan dikirim.';
+      }
+      return true;
+    }catch(err){
+      storageAvailable = false;
+      note.classList.add('off');
+      noteText.textContent = 'Belum tersambung ke database (D1) — data hanya bertahan selama sesi ini. Lihat README.md.';
+      return false;
+    }
+  }
+
+  buildOrders();
+
+  /* ============================================================
+     NAVIGATION
+  ============================================================ */
+  const navTabs = document.getElementById('navTabs');
+  navTabs.addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-view]');
+    if(!btn) return;
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('section.view').forEach(s=>s.classList.remove('active'));
+    document.getElementById('view-'+btn.dataset.view).classList.add('active');
+    if(btn.dataset.view === 'dashboard') renderDashboard();
+    if(btn.dataset.view === 'data-order') renderOrderTable();
+    if(btn.dataset.view === 'timeline') renderTimeline();
+    if(btn.dataset.view === 'master') renderMaster();
+  });
+
+  /* ============================================================
+     DASHBOARD
+  ============================================================ */
+  function renderDashboard(){
+    const orders = state.orders.map(o=>({...o, status: computeStatus(o)}));
+    const active = orders.filter(o=>o.status==='Pending'||o.status==='OnProgress'||o.status==='Delayed');
+    const totalQtyProd = active.reduce((s,o)=>s+o.qty,0);
+
+    // penjahit paling produktif = total qty pcs selesai (completed)
+    const prodByTailor = {};
+    orders.filter(o=>o.status==='Completed').forEach(o=>{
+      prodByTailor[o.tailorId] = (prodByTailor[o.tailorId]||0) + o.qty;
+    });
+    let topTailorId = Object.keys(prodByTailor).sort((a,b)=>prodByTailor[b]-prodByTailor[a])[0];
+    const topTailor = topTailorId ? findTailor(topTailorId) : null;
+
+    // rata-rata ketepatan waktu: % completed yang actual <= estimated
+    const completed = orders.filter(o=>o.status==='Completed' && o.actualCompletion);
+    let onTimeCount = completed.filter(o=>o.actualCompletion <= o.estimatedCompletion).length;
+    const punctuality = completed.length ? Math.round((onTimeCount/completed.length)*100) : 0;
+
+    const stats = [
+      {label:'Total Active Order', value: active.length, sub: `${orders.length} order sepanjang periode`},
+      {label:'Total Qty Dalam Produksi', value: totalQtyProd.toLocaleString('id-ID')+' pcs', sub:'Order Pending + On Progress + Delayed'},
+      {label:'Penjahit Paling Produktif', value: topTailor ? topTailor.name : '—', sub: topTailor ? `${prodByTailor[topTailorId].toLocaleString('id-ID')} pcs diselesaikan` : 'Belum ada data selesai'},
+      {label:'Rata-rata Ketepatan Waktu', value: punctuality+'%', sub: `${onTimeCount} dari ${completed.length} order tepat waktu`, up: punctuality>=70},
+    ];
+    document.getElementById('statGrid').innerHTML = stats.map(s=>`
+      <div class="stat-card">
+        <div class="label">${s.label}</div>
+        <div class="value">${s.value}</div>
+        <div class="sub ${s.up?'up':''}">${s.sub}</div>
+      </div>`).join('');
+
+    // recent orders (5 terbaru berdasar order date)
+    const recent = [...orders].sort((a,b)=>b.orderDate-a.orderDate).slice(0,6);
+    document.querySelector('#recentOrderTable tbody').innerHTML = recent.map(o=>{
+      const product = findProduct(o.productCode);
+      const tailor = findTailor(o.tailorId);
+      return `<tr>
+        <td class="mono cell-strong">${o.id}</td>
+        <td>${o.customer}</td>
+        <td>${product.name}</td>
+        <td class="mono">${o.qty}</td>
+        <td>${tailor.name}</td>
+        <td class="mono">${fmtDateTime(o.estimatedCompletion)}</td>
+        <td>${statusBadge(o.status)}</td>
+      </tr>`;
+    }).join('');
+
+    // productive list top 5
+    const ranked = Object.keys(prodByTailor).sort((a,b)=>prodByTailor[b]-prodByTailor[a]).slice(0,5);
+    document.getElementById('productiveList').innerHTML = ranked.length ? ranked.map((tid,i)=>{
+      const t = findTailor(tid);
+      const max = prodByTailor[ranked[0]];
+      const pct = Math.round((prodByTailor[tid]/max)*100);
+      return `<div style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px;">
+          <span><strong>${i+1}. ${t.name}</strong></span><span>${prodByTailor[tid]} pcs</span>
+        </div>
+        <div style="background:var(--olive-200);border-radius:6px;height:7px;overflow:hidden;">
+          <div style="width:${pct}%;background:var(--gold-500);height:100%;"></div>
+        </div>
+      </div>`;
+    }).join('') : '<div class="empty-state">Belum ada order selesai.</div>';
+
+    // status distribution
+    const counts = {Pending:0,OnProgress:0,Completed:0,Delayed:0};
+    orders.forEach(o=>counts[o.status]++);
+    const total = orders.length || 1;
+    document.getElementById('statusDist').innerHTML = Object.keys(counts).map(k=>{
+      const pct = Math.round((counts[k]/total)*100);
+      return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <div style="width:96px;font-size:12.5px;">${statusLabel(k)}</div>
+        <div style="flex:1;background:var(--olive-200);border-radius:6px;height:9px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${statusColor(k)};"></div>
+        </div>
+        <div style="width:34px;text-align:right;font-size:12px;color:var(--ink-500);">${counts[k]}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function statusLabel(s){
+    return {Pending:'Pending',OnProgress:'On Progress',Completed:'Completed',Delayed:'Delayed'}[s]||s;
+  }
+  function statusColor(s){
+    return {Pending:'var(--warning)',OnProgress:'var(--info)',Completed:'var(--success)',Delayed:'var(--danger)'}[s];
+  }
+  function statusBadge(s){
+    return `<span class="badge ${s}">${statusLabel(s)}</span>`;
+  }
+
+  /* ============================================================
+     ORDER FORM + LIVE ESTIMATE
+  ============================================================ */
+  const fOrderId = document.getElementById('fOrderId');
+  const fCustomer = document.getElementById('fCustomer');
+  const fOrderDate = document.getElementById('fOrderDate');
+  const fProduct = document.getElementById('fProduct');
+  const fQty = document.getElementById('fQty');
+  const fTailor = document.getElementById('fTailor');
+  const fStart = document.getElementById('fStart');
+  const fNote = document.getElementById('fNote');
+  const estimateBox = document.getElementById('estimateBox');
+
+  function populateFormSelects(){
+    fProduct.innerHTML = state.products.map(p=>`<option value="${p.code}">${p.name}</option>`).join('');
+    fTailor.innerHTML = state.tailors
+      .map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
+  }
+  populateFormSelects();
+  fOrderDate.value = toInputDate(TODAY);
+  fStart.value = toInputDateTime(TODAY);
+
+  function updateLivePreview(){
+    const product = findProduct(fProduct.value);
+    const tailor = findTailor(fTailor.value);
+    const qty = parseInt(fQty.value,10) || 0;
+    const startVal = fStart.value;
+
+    if(!product || !tailor || !qty || !startVal){
+      estimateBox.classList.add('empty');
+      estimateBox.querySelector('.big').textContent = 'Lengkapi produk, qty, penjahit & waktu mulai';
+      const meta = estimateBox.querySelector('.meta');
+      if(meta) meta.remove();
+      return;
+    }
+    estimateBox.classList.remove('empty');
+    const start = new Date(startVal);
+    const est = estimateCompletion(start, qty, product.avgMinutes, DEFAULT_DAILY_HOURS);
+
+    estimateBox.querySelector('.big').textContent = fmtDateTime(est.completion);
+    let meta = estimateBox.querySelector('.meta');
+    if(!meta){
+      meta = document.createElement('div');
+      meta.className = 'meta';
+      estimateBox.appendChild(meta);
+    }
+    meta.innerHTML = `
+      <div><span class="k">Total Jam Kerja</span><span class="v">${est.totalHours.toFixed(1)} jam</span></div>
+      <div><span class="k">Hari Kerja Dibutuhkan</span><span class="v">${est.workDaysNeeded.toFixed(2)} hari</span></div>
+      <div><span class="k">Penjahit</span><span class="v">${tailor.name}</span></div>
+    `;
+  }
+  ['input','change'].forEach(evt=>{
+    [fProduct,fQty,fTailor,fStart].forEach(el=>el.addEventListener(evt, updateLivePreview));
+  });
+  updateLivePreview();
+
+  document.getElementById('orderForm').addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const orderId = fOrderId.value.trim();
+    const isDuplicate = state.orders.some(o=>o.id.toLowerCase() === orderId.toLowerCase());
+    if(isDuplicate){
+      alert(`Nomor order "${orderId}" sudah dipakai. Gunakan nomor lain.`);
+      fOrderId.focus();
+      return;
+    }
+    const product = findProduct(fProduct.value);
+    const tailor = findTailor(fTailor.value);
+    const qty = parseInt(fQty.value,10);
+    const start = new Date(fStart.value);
+    const orderDate = new Date(fOrderDate.value + 'T00:00:00');
+
+    const est = estimateCompletion(start, qty, product.avgMinutes, DEFAULT_DAILY_HOURS);
+    const newOrder = {
+      id: orderId,
+      customer: fCustomer.value.trim(),
+      productCode: product.code,
+      qty, tailorId: tailor.id,
+      orderDate, startDateTime: start,
+      estimatedCompletion: est.completion,
+      totalHours: est.totalHours,
+      actualCompletion: null,
+      manualStatus: null,
+      note: fNote.value.trim() || null
+    };
+    state.orders.unshift(newOrder);
+    e.target.reset();
+    fOrderDate.value = toInputDate(TODAY);
+    fStart.value = toInputDateTime(TODAY);
+    updateLivePreview();
+    populateFilterSelects();
+    renderOrderTable();
+    persist();
+    alert(`Order ${newOrder.id} berhasil disimpan.\nEstimasi selesai: ${fmtDateTime(est.completion)}`);
+  });
+
+  /* ============================================================
+     DATA ORDER TABLE + FILTERS
+  ============================================================ */
+  const filterTailor = document.getElementById('filterTailor');
+  const filterStatus = document.getElementById('filterStatus');
+  const filterFrom = document.getElementById('filterFrom');
+  const filterTo = document.getElementById('filterTo');
+
+  function populateFilterSelects(){
+    filterTailor.innerHTML = '<option value="">Semua Penjahit</option>' +
+      state.tailors.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
+  }
+  populateFilterSelects();
+
+  function getFilteredOrders(){
+    return state.orders
+      .map(o=>({...o, status: computeStatus(o)}))
+      .filter(o=>{
+        if(filterTailor.value && o.tailorId !== filterTailor.value) return false;
+        if(filterStatus.value && o.status !== filterStatus.value) return false;
+        if(filterFrom.value && o.orderDate < new Date(filterFrom.value+'T00:00:00')) return false;
+        if(filterTo.value && o.orderDate > new Date(filterTo.value+'T23:59:59')) return false;
+        return true;
+      })
+      .sort((a,b)=>b.orderDate-a.orderDate);
+  }
+
+  function statusSelect(order){
+    const current = order.status;
+    const options = ['Otomatis','Pending','OnProgress','Completed','Delayed'];
+    const optHtml = options.map(opt=>{
+      const val = opt === 'Otomatis' ? 'auto' : opt;
+      const label = opt === 'Otomatis' ? 'Otomatis (ikuti tanggal)' : statusLabel(opt);
+      const selected = (opt === 'Otomatis' ? !order.manualStatus : order.manualStatus === opt) ? 'selected' : '';
+      return `<option value="${val}" ${selected}>${label}</option>`;
+    }).join('');
+    return `<select class="status-select ${current}" data-status-order="${order.id}">${optHtml}</select>`;
+  }
+
+  function renderOrderTable(){
+    const rows = getFilteredOrders();
+    const tbody = document.querySelector('#orderTable tbody');
+    if(!rows.length){
+      tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state">Tidak ada order yang cocok dengan filter.</div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(o=>{
+      const product = findProduct(o.productCode);
+      const tailor = findTailor(o.tailorId);
+      return `<tr>
+        <td class="mono cell-strong">${o.id}</td>
+        <td class="mono">${fmtDate(o.orderDate)}</td>
+        <td>${o.customer}</td>
+        <td>${product.name}</td>
+        <td class="mono">${o.qty}</td>
+        <td>${tailor.name}</td>
+        <td class="mono">${fmtDateTime(o.startDateTime)}</td>
+        <td class="mono">${fmtDateTime(o.estimatedCompletion)}</td>
+        <td>${statusSelect(o)}</td>
+        <td><button class="icon-btn danger" title="Hapus order" data-del-order="${o.id}">🗑</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.querySelector('#orderTable').addEventListener('click', (e)=>{
+    const delBtn = e.target.closest('[data-del-order]');
+    if(!delBtn) return;
+    const orderId = delBtn.dataset.delOrder;
+    const order = state.orders.find(o=>o.id===orderId);
+    if(!order) return;
+    if(confirm(`Hapus order "${order.id}" (${order.customer})? Tindakan ini tidak bisa dibatalkan.`)){
+      state.orders = state.orders.filter(o=>o.id!==orderId);
+      renderOrderTable();
+      renderDashboard();
+      renderTimeline();
+      persist();
+    }
+  });
+
+  document.querySelector('#orderTable').addEventListener('change', (e)=>{
+    const select = e.target.closest('[data-status-order]');
+    if(!select) return;
+    const order = state.orders.find(o=>o.id === select.dataset.statusOrder);
+    if(!order) return;
+    const newVal = select.value;
+    if(newVal === 'auto'){
+      order.manualStatus = null;
+    } else if(newVal === 'Completed'){
+      order.manualStatus = 'Completed';
+      if(!order.actualCompletion) order.actualCompletion = new Date(TODAY);
+    } else {
+      order.manualStatus = newVal;
+      order.actualCompletion = null;
+    }
+    renderOrderTable();
+    renderDashboard();
+    renderTimeline();
+    persist();
+  });
+
+  [filterTailor,filterStatus,filterFrom,filterTo].forEach(el=>el.addEventListener('change', renderOrderTable));
+  document.getElementById('clearFilters').addEventListener('click', ()=>{
+    filterTailor.value=''; filterStatus.value=''; filterFrom.value=''; filterTo.value='';
+    renderOrderTable();
+  });
+
+  document.getElementById('exportCsv').addEventListener('click', ()=>{
+    const rows = getFilteredOrders();
+    const header = ['ID Order','Tanggal Order','Pelanggan','Nama Produk','Qty','Penjahit','Mulai Pengerjaan','Estimasi Selesai','Status'];
+    const lines = [header.join(';')];
+    rows.forEach(o=>{
+      const product = findProduct(o.productCode);
+      const tailor = findTailor(o.tailorId);
+      lines.push([
+        o.id, fmtDate(o.orderDate), csvSafe(o.customer), csvSafe(product.name),
+        o.qty, csvSafe(tailor.name), fmtDateTime(o.startDateTime), fmtDateTime(o.estimatedCompletion), statusLabel(o.status)
+      ].join(';'));
+    });
+    const csvContent = '\uFEFF' + lines.join('\r\n');
+    const blob = new Blob([csvContent], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `laporan-order-jahit-${toInputDate(TODAY)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+  function csvSafe(s){ return `"${String(s).replace(/"/g,'""')}"`; }
+
+  /* ============================================================
+     TIMELINE / GANTT
+  ============================================================ */
+  function renderTimeline(){
+    const orders = state.orders.map(o=>({...o, status: computeStatus(o)}));
+    if(!orders.length){
+      document.getElementById('timelineBody').innerHTML = '<div class="empty-state">Belum ada order.</div>';
+      document.getElementById('timelineAxis').innerHTML='';
+      return;
+    }
+    let minDate = new Date(Math.min(...orders.map(o=>o.startDateTime.getTime())));
+    let maxDate = new Date(Math.max(...orders.map(o=>o.estimatedCompletion.getTime())));
+    // padding satu hari di tiap sisi
+    minDate = new Date(minDate.getTime() - 12*3600*1000);
+    maxDate = new Date(maxDate.getTime() + 12*3600*1000);
+    const totalSpan = maxDate - minDate;
+
+    // axis: tick tiap ~2 hari
+    const axis = document.getElementById('timelineAxis');
+    const dayMs = 24*3600*1000;
+    const tickCount = Math.min(10, Math.ceil(totalSpan/dayMs));
+    const step = totalSpan / tickCount;
+    let axisHtml = '';
+    for(let i=0;i<=tickCount;i++){
+      const t = new Date(minDate.getTime() + step*i);
+      const pct = (step*i/totalSpan)*100;
+      axisHtml += `<span style="left:${pct}%;">${pad(t.getDate())}/${pad(t.getMonth()+1)}</span>`;
+    }
+    axis.innerHTML = axisHtml;
+
+    const todayPct = ((TODAY - minDate)/totalSpan)*100;
+
+    const byTailor = {};
+    state.tailors.forEach(t=>byTailor[t.id]=[]);
+    orders.forEach(o=>{ if(byTailor[o.tailorId]) byTailor[o.tailorId].push(o); });
+
+    const body = document.getElementById('timelineBody');
+    body.innerHTML = state.tailors.map(t=>{
+      const list = byTailor[t.id];
+      const activeQty = list.filter(o=>o.status!=='Completed').reduce((s,o)=>s+o.qty,0);
+      const bars = list.map(o=>{
+        const product = findProduct(o.productCode);
+        const left = ((o.startDateTime - minDate)/totalSpan)*100;
+        const width = Math.max(((o.estimatedCompletion - o.startDateTime)/totalSpan)*100, 1.2);
+        return `<div class="order-bar ${o.status}" style="left:${left}%;width:${width}%;" title="${o.id} · ${product.name} · ${o.qty} pcs · ${statusLabel(o.status)}&#10;Mulai: ${fmtDateTime(o.startDateTime)}&#10;Estimasi: ${fmtDateTime(o.estimatedCompletion)}">${o.id}</div>`;
+      }).join('');
+      const todayLine = (todayPct>=0 && todayPct<=100) ? `<div class="today-line" style="left:${todayPct}%;"></div>` : '';
+      return `<div class="tailor-row">
+        <div class="tailor-info">
+          <div class="name">${t.name}</div>
+          <div class="cap">${activeQty} pcs aktif · ${DEFAULT_DAILY_HOURS} jam/hari</div>
+        </div>
+        <div class="tailor-track">${bars}${todayLine}</div>
+      </div>`;
+    }).join('');
+  }
+
+  /* ============================================================
+     MASTER DATA VIEW
+  ============================================================ */
+  function renderMaster(){
+    document.querySelector('#tailorTable tbody').innerHTML = state.tailors.map(t=>`
+      <tr>
+        <td class="mono">${t.id}</td>
+        <td class="cell-strong">${t.name}</td>
+        <td>
+          <button class="icon-btn" title="Edit" data-edit-tailor="${t.id}">✎</button>
+          <button class="icon-btn danger" title="Hapus" data-del-tailor="${t.id}">🗑</button>
+        </td>
+      </tr>`).join('');
+
+    document.querySelector('#productTable tbody').innerHTML = state.products.map(p=>`
+      <tr>
+        <td class="cell-strong">${p.name}</td>
+        <td class="mono">${p.avgMinutes} menit</td>
+        <td class="mono">${p.unit}</td>
+        <td>
+          <button class="icon-btn" title="Edit" data-edit-product="${p.code}">✎</button>
+          <button class="icon-btn danger" title="Hapus" data-del-product="${p.code}">🗑</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  /* ---------- CRUD: PRODUK ---------- */
+  const productFormWrap = document.getElementById('productFormWrap');
+  const productForm = document.getElementById('productForm');
+  const pfEditCode = document.getElementById('pfEditCode');
+  const pfSubmitBtn = document.getElementById('pfSubmitBtn');
+
+  // Kode internal dibuat otomatis dari nama produk — hanya dipakai di
+  // belakang layar untuk menghubungkan order ke produk, tidak pernah
+  // ditampilkan karena kode tiap order unik dan tidak relevan sebagai
+  // referensi produk.
+  function generateProductCode(name){
+    let base = 'P-' + String(name||'PRODUK').toUpperCase().replace(/[^A-Z0-9]+/g,'').slice(0,10);
+    if(base === 'P-') base = 'P-PRODUK';
+    let code = base, n = 1;
+    while(findProduct(code)){ n++; code = base + '-' + n; }
+    return code;
+  }
+
+  function openProductForm(product){
+    productFormWrap.classList.remove('hidden');
+    if(product){
+      pfEditCode.value = product.code;
+      document.getElementById('pfName').value = product.name;
+      document.getElementById('pfMinutes').value = product.avgMinutes;
+      document.getElementById('pfUnit').value = product.unit;
+      pfSubmitBtn.textContent = 'Simpan Perubahan';
+    } else {
+      productForm.reset();
+      pfEditCode.value = '';
+      document.getElementById('pfUnit').value = 'Pcs';
+      pfSubmitBtn.textContent = 'Simpan Produk';
+    }
+    productFormWrap.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+  function closeProductForm(){
+    productFormWrap.classList.add('hidden');
+    productForm.reset();
+  }
+
+  document.getElementById('btnAddProduct').addEventListener('click', ()=>openProductForm(null));
+  document.getElementById('pfCancelBtn').addEventListener('click', closeProductForm);
+
+  productForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const editing = pfEditCode.value;
+    const data = {
+      code: editing || null,
+      name: document.getElementById('pfName').value.trim(),
+      avgMinutes: parseFloat(document.getElementById('pfMinutes').value),
+      unit: document.getElementById('pfUnit').value.trim() || 'Pcs'
+    };
+    if(!editing){
+      data.code = generateProductCode(data.name);
+    }
+    if(editing){
+      const idx = state.products.findIndex(p=>p.code===editing);
+      state.products[idx] = data;
+    } else {
+      state.products.push(data);
+    }
+    closeProductForm();
+    populateFormSelects();
+    populateFilterSelects();
+    renderMaster();
+    renderOrderTable();
+    renderDashboard();
+    renderTimeline();
+    updateLivePreview();
+    await persist();
+  });
+
+  document.querySelector('#productTable').addEventListener('click', (e)=>{
+    const editBtn = e.target.closest('[data-edit-product]');
+    const delBtn = e.target.closest('[data-del-product]');
+    if(editBtn){
+      const p = findProduct(editBtn.dataset.editProduct);
+      if(p) openProductForm(p);
+    }
+    if(delBtn){
+      const code = delBtn.dataset.delProduct;
+      const inUse = state.orders.some(o=>o.productCode===code);
+      if(inUse){
+        alert('Produk ini masih dipakai di data order dan tidak bisa dihapus. Hapus/ubah order terkait terlebih dahulu.');
+        return;
+      }
+      if(confirm(`Hapus produk "${findProduct(code).name}"?`)){
+        state.products = state.products.filter(p=>p.code!==code);
+        populateFormSelects(); populateFilterSelects(); renderMaster(); persist();
+      }
+    }
+  });
+
+  /* ---------- CRUD: PENJAHIT ---------- */
+  const tailorFormWrap = document.getElementById('tailorFormWrap');
+  const tailorForm = document.getElementById('tailorForm');
+  const tfEditId = document.getElementById('tfEditId');
+  const tfSubmitBtn = document.getElementById('tfSubmitBtn');
+
+  function openTailorForm(tailor){
+    tailorFormWrap.classList.remove('hidden');
+    if(tailor){
+      tfEditId.value = tailor.id;
+      document.getElementById('tfName').value = tailor.name;
+      tfSubmitBtn.textContent = 'Simpan Perubahan';
+    } else {
+      tailorForm.reset();
+      tfEditId.value = '';
+      tfSubmitBtn.textContent = 'Simpan Penjahit';
+    }
+    tailorFormWrap.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+  function closeTailorForm(){
+    tailorFormWrap.classList.add('hidden');
+    tailorForm.reset();
+  }
+
+  document.getElementById('btnAddTailor').addEventListener('click', ()=>openTailorForm(null));
+  document.getElementById('tfCancelBtn').addEventListener('click', closeTailorForm);
+
+  tailorForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const editing = tfEditId.value;
+    const data = {
+      id: editing || ('T' + String(Date.now()).slice(-6)),
+      name: document.getElementById('tfName').value.trim()
+    };
+    if(editing){
+      const idx = state.tailors.findIndex(t=>t.id===editing);
+      state.tailors[idx] = data;
+    } else {
+      state.tailors.push(data);
+    }
+    closeTailorForm();
+    populateFormSelects();
+    populateFilterSelects();
+    renderMaster();
+    renderOrderTable();
+    renderDashboard();
+    renderTimeline();
+    await persist();
+  });
+
+  document.querySelector('#tailorTable').addEventListener('click', (e)=>{
+    const editBtn = e.target.closest('[data-edit-tailor]');
+    const delBtn = e.target.closest('[data-del-tailor]');
+    if(editBtn){
+      const t = findTailor(editBtn.dataset.editTailor);
+      if(t) openTailorForm(t);
+    }
+    if(delBtn){
+      const id = delBtn.dataset.delTailor;
+      const inUse = state.orders.some(o=>o.tailorId===id);
+      if(inUse){
+        alert('Penjahit ini masih memiliki data order dan tidak bisa dihapus. Hapus/pindahkan order terkait terlebih dahulu.');
+        return;
+      }
+      if(confirm(`Hapus data penjahit "${findTailor(id).name}"?`)){
+        state.tailors = state.tailors.filter(t=>t.id!==id);
+        populateFormSelects(); populateFilterSelects(); renderMaster(); persist();
+      }
+    }
+  });
+
+  /* ============================================================
+     INIT
+  ============================================================ */
+  (async function init(){
+    await loadPersisted();
+    populateFormSelects();
+    populateFilterSelects();
+    updateLivePreview();
+    renderDashboard();
+    renderOrderTable();
+    renderTimeline();
+    renderMaster();
+    // simpan snapshot awal (memastikan key tersedia untuk sesi berikutnya)
+    persist();
+  })();
+
+})();
+</script>
+</body>
+</html>
