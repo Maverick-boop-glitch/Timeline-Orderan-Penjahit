@@ -374,9 +374,11 @@
       <div class="panel">
         <h3>Detail Order</h3>
         <form id="orderForm" class="form-grid">
-          <div class="field">
-            <label>Nomor Order / ID Transaksi</label>
-            <input type="text" id="fOrderId" placeholder="Contoh: SO-2026-08-001" required>
+          <input type="hidden" id="foEditId">
+          <div class="field full">
+            <label>Nomor Order / ID Transaksi (boleh lebih dari satu, pisahkan dengan koma)</label>
+            <input type="text" id="fOrderId" placeholder="Contoh: SO-2026-08-001, SO-2026-08-002">
+            <small style="font-size:11.5px;color:var(--ink-500);">Berguna kalau beberapa nomor order/transaksi digabung jadi satu orderan produksi.</small>
           </div>
           <div class="field">
             <label>Nama Pelanggan</label>
@@ -407,8 +409,9 @@
             <input type="text" id="fNote" placeholder="Contoh: warna navy, bordir nama depan">
           </div>
           <div class="field full" style="flex-direction:row;gap:10px;margin-top:6px;">
-            <button type="submit" class="btn btn-primary">Simpan Order</button>
+            <button type="submit" class="btn btn-primary" id="foSubmitBtn">Simpan Order</button>
             <button type="reset" class="btn btn-ghost" id="resetForm">Bersihkan</button>
+            <button type="button" class="btn btn-ghost hidden" id="foCancelEditBtn">Batal Edit</button>
           </div>
         </form>
       </div>
@@ -646,7 +649,18 @@
     nextNum: 1
   };
 
-  const TODAY = new Date(2026,7,10, 9,30); // 10 Agustus 2026, dijadikan "sekarang" untuk konsistensi demo
+  // Menghitung "sekarang" dalam WIB (UTC+7) secara eksplisit, supaya
+  // tidak bergantung pada zona waktu perangkat pengguna. Objek Date yang
+  // dihasilkan dipakai apa adanya (getHours/getDay dst. dibaca sebagai
+  // representasi WIB) di seluruh aplikasi.
+  function nowWIB(){
+    const shifted = new Date(Date.now() + 7*60*60*1000);
+    return new Date(
+      shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate(),
+      shifted.getUTCHours(), shifted.getUTCMinutes(), shifted.getUTCSeconds()
+    );
+  }
+  const TODAY = nowWIB(); // dipakai sebagai acuan "sekarang" di seluruh aplikasi (status order, dsb.)
 
   /* ============================================================
      JAM KERJA PERUSAHAAN
@@ -679,6 +693,9 @@
   function tailorNames(ids){
     const list = (ids||[]).map(id=>{ const t=findTailor(id); return t ? t.name : null; }).filter(Boolean);
     return list.length ? list.join(', ') : '—';
+  }
+  function orderNumbersDisplay(o){
+    return (o.orderNumbers && o.orderNumbers.length) ? o.orderNumbers.join(', ') : o.id;
   }
 
   /* ============================================================
@@ -790,8 +807,10 @@
       const startDateTime = new Date(...r.start);
       const est = estimateCompletion(startDateTime, r.qty, product.avgMinutes, 1);
       const actualCompletion = r.actual ? new Date(...r.actual) : null;
+      const id = 'ORD-' + String(idx+1).padStart(4,'0');
       return {
-        id: 'ORD-' + String(idx+1).padStart(4,'0'),
+        id,
+        orderNumbers: [id],
         customer: r.customer,
         productCode: product.code,
         qty: r.qty,
@@ -954,7 +973,7 @@
     document.querySelector('#recentOrderTable tbody').innerHTML = recent.map(o=>{
       const product = findProduct(o.productCode);
       return `<tr>
-        <td class="mono cell-strong">${o.id}</td>
+        <td class="mono cell-strong">${orderNumbersDisplay(o)}</td>
         <td>${o.customer}</td>
         <td>${product.name}</td>
         <td class="mono">${o.qty}</td>
@@ -1009,6 +1028,9 @@
   /* ============================================================
      ORDER FORM + LIVE ESTIMATE
   ============================================================ */
+  const foEditId = document.getElementById('foEditId');
+  const foSubmitBtn = document.getElementById('foSubmitBtn');
+  const foCancelEditBtn = document.getElementById('foCancelEditBtn');
   const fOrderId = document.getElementById('fOrderId');
   const fCustomer = document.getElementById('fCustomer');
   const fOrderDate = document.getElementById('fOrderDate');
@@ -1022,6 +1044,16 @@
   function getSelectedTailorIds(){
     return Array.from(fTailorGroup.querySelectorAll('input:checked')).map(cb=>cb.value);
   }
+  function setSelectedTailorIds(ids){
+    fTailorGroup.querySelectorAll('input').forEach(cb=>{
+      const checked = (ids||[]).includes(cb.value);
+      cb.checked = checked;
+      cb.closest('.checkbox-chip').classList.toggle('checked', checked);
+    });
+  }
+  function parseOrderNumbers(raw){
+    return raw.split(',').map(s=>s.trim()).filter(Boolean);
+  }
 
   function populateFormSelects(){
     fProduct.innerHTML = state.products.map(p=>`<option value="${p.code}">${p.name}</option>`).join('');
@@ -1032,8 +1064,59 @@
       </label>`).join('');
   }
   populateFormSelects();
-  fOrderDate.value = toInputDate(TODAY);
-  fStart.value = toInputDateTime(TODAY);
+
+  function resetOrderFormDefaults(){
+    // "Sekarang" dihitung ulang tiap form dibuka/direset, bukan dibekukan
+    // di waktu page-load, supaya selalu akurat mengikuti jam WIB saat ini.
+    const now = nowWIB();
+    fOrderDate.value = toInputDate(now);
+    fStart.value = toInputDateTime(now);
+  }
+  resetOrderFormDefaults();
+
+  function exitEditMode(){
+    foEditId.value = '';
+    foSubmitBtn.textContent = 'Simpan Order';
+    foCancelEditBtn.classList.add('hidden');
+  }
+  exitEditMode();
+
+  function openOrderEditForm(order){
+    foEditId.value = order.id;
+    fOrderId.value = (order.orderNumbers && order.orderNumbers.length) ? order.orderNumbers.join(', ') : order.id;
+    fCustomer.value = order.customer;
+    fOrderDate.value = toInputDate(order.orderDate);
+    fProduct.value = order.productCode;
+    fQty.value = order.qty;
+    setSelectedTailorIds(order.tailorIds);
+    fStart.value = toInputDateTime(order.startDateTime);
+    fNote.value = order.note || '';
+    foSubmitBtn.textContent = 'Simpan Perubahan';
+    foCancelEditBtn.classList.remove('hidden');
+    document.querySelector('[data-view="order-baru"]').click();
+    updateLivePreview();
+    document.getElementById('orderForm').scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  foCancelEditBtn.addEventListener('click', ()=>{
+    document.getElementById('orderForm').reset();
+    exitEditMode();
+    resetOrderFormDefaults();
+    setSelectedTailorIds([]);
+    updateLivePreview();
+  });
+
+  document.getElementById('orderForm').addEventListener('reset', ()=>{
+    // dijalankan setelah browser selesai mengosongkan field bawaan,
+    // supaya tanggal/jam bisa langsung diisi ulang dengan waktu WIB
+    // saat ini, dan form keluar dari mode edit jika sedang aktif.
+    setTimeout(()=>{
+      exitEditMode();
+      resetOrderFormDefaults();
+      setSelectedTailorIds([]);
+      updateLivePreview();
+    }, 0);
+  });
 
   fTailorGroup.addEventListener('change', (e)=>{
     const chip = e.target.closest('.checkbox-chip');
@@ -1078,10 +1161,19 @@
 
   document.getElementById('orderForm').addEventListener('submit', (e)=>{
     e.preventDefault();
-    const orderId = fOrderId.value.trim();
-    const isDuplicate = state.orders.some(o=>o.id.toLowerCase() === orderId.toLowerCase());
-    if(isDuplicate){
-      alert(`Nomor order "${orderId}" sudah dipakai. Gunakan nomor lain.`);
+    const editing = foEditId.value;
+    const orderNumbers = parseOrderNumbers(fOrderId.value);
+    if(!orderNumbers.length){
+      alert('Masukkan minimal satu Nomor Order / ID Transaksi.');
+      fOrderId.focus();
+      return;
+    }
+    // cek duplikat terhadap SEMUA nomor order yang sudah tersimpan di order lain
+    const dup = orderNumbers.find(num=>
+      state.orders.some(o=> o.id!==editing && (o.orderNumbers||[]).some(existing=>existing.toLowerCase()===num.toLowerCase()))
+    );
+    if(dup){
+      alert(`Nomor order "${dup}" sudah dipakai di order lain. Gunakan nomor lain.`);
       fOrderId.focus();
       return;
     }
@@ -1094,30 +1186,51 @@
     const qty = parseInt(fQty.value,10);
     const start = new Date(fStart.value);
     const orderDate = new Date(fOrderDate.value + 'T00:00:00');
-
     const est = estimateCompletion(start, qty, product.avgMinutes, tailorIds.length);
-    const newOrder = {
-      id: orderId,
-      customer: fCustomer.value.trim(),
-      productCode: product.code,
-      qty, tailorIds,
-      orderDate, startDateTime: start,
-      estimatedCompletion: est.completion,
-      totalHours: est.totalHours,
-      actualCompletion: null,
-      manualStatus: null,
-      note: fNote.value.trim() || null
-    };
-    state.orders.unshift(newOrder);
+
+    if(editing){
+      const idx = state.orders.findIndex(o=>o.id===editing);
+      if(idx === -1){ alert('Order tidak ditemukan (mungkin sudah dihapus).'); exitEditMode(); return; }
+      const existing = state.orders[idx];
+      state.orders[idx] = {
+        ...existing,
+        orderNumbers, customer: fCustomer.value.trim(),
+        productCode: product.code, qty, tailorIds,
+        orderDate, startDateTime: start,
+        estimatedCompletion: est.completion,
+        totalHours: est.totalHours,
+        note: fNote.value.trim() || null
+      };
+      alert(`Order ${orderNumbers.join(', ')} berhasil diperbarui.\nDikerjakan oleh: ${tailorNames(tailorIds)}\nEstimasi selesai: ${fmtDateTime(est.completion)}`);
+    } else {
+      const id = 'ORD-' + String(state.nextNum).padStart(4,'0');
+      state.nextNum++;
+      const newOrder = {
+        id, orderNumbers,
+        customer: fCustomer.value.trim(),
+        productCode: product.code,
+        qty, tailorIds,
+        orderDate, startDateTime: start,
+        estimatedCompletion: est.completion,
+        totalHours: est.totalHours,
+        actualCompletion: null,
+        manualStatus: null,
+        note: fNote.value.trim() || null
+      };
+      state.orders.unshift(newOrder);
+      alert(`Order ${orderNumbers.join(', ')} berhasil disimpan.\nDikerjakan oleh: ${tailorNames(tailorIds)}\nEstimasi selesai: ${fmtDateTime(est.completion)}`);
+    }
+
     e.target.reset();
-    fTailorGroup.querySelectorAll('.checkbox-chip').forEach(c=>c.classList.remove('checked'));
-    fOrderDate.value = toInputDate(TODAY);
-    fStart.value = toInputDateTime(TODAY);
+    exitEditMode();
+    setSelectedTailorIds([]);
+    resetOrderFormDefaults();
     updateLivePreview();
     populateFilterSelects();
     renderOrderTable();
+    renderDashboard();
+    renderTimeline();
     persist();
-    alert(`Order ${newOrder.id} berhasil disimpan.\nDikerjakan oleh: ${tailorNames(tailorIds)}\nEstimasi selesai: ${fmtDateTime(est.completion)}`);
   });
 
   /* ============================================================
@@ -1169,7 +1282,7 @@
     tbody.innerHTML = rows.map(o=>{
       const product = findProduct(o.productCode);
       return `<tr>
-        <td class="mono cell-strong">${o.id}</td>
+        <td class="mono cell-strong">${orderNumbersDisplay(o)}</td>
         <td class="mono">${fmtDate(o.orderDate)}</td>
         <td>${o.customer}</td>
         <td>${product.name}</td>
@@ -1178,18 +1291,27 @@
         <td class="mono">${fmtDateTime(o.startDateTime)}</td>
         <td class="mono">${fmtDateTime(o.estimatedCompletion)}</td>
         <td>${statusSelect(o)}</td>
-        <td><button class="icon-btn danger" title="Hapus order" data-del-order="${o.id}">🗑</button></td>
+        <td>
+          <button class="icon-btn" title="Edit order" data-edit-order="${o.id}">✎</button>
+          <button class="icon-btn danger" title="Hapus order" data-del-order="${o.id}">🗑</button>
+        </td>
       </tr>`;
     }).join('');
   }
 
   document.querySelector('#orderTable').addEventListener('click', (e)=>{
+    const editBtn = e.target.closest('[data-edit-order]');
+    if(editBtn){
+      const order = state.orders.find(o=>o.id===editBtn.dataset.editOrder);
+      if(order) openOrderEditForm(order);
+      return;
+    }
     const delBtn = e.target.closest('[data-del-order]');
     if(!delBtn) return;
     const orderId = delBtn.dataset.delOrder;
     const order = state.orders.find(o=>o.id===orderId);
     if(!order) return;
-    if(confirm(`Hapus order "${order.id}" (${order.customer})? Tindakan ini tidak bisa dibatalkan.`)){
+    if(confirm(`Hapus order "${orderNumbersDisplay(order)}" (${order.customer})? Tindakan ini tidak bisa dibatalkan.`)){
       state.orders = state.orders.filter(o=>o.id!==orderId);
       renderOrderTable();
       renderDashboard();
@@ -1232,7 +1354,7 @@
     rows.forEach(o=>{
       const product = findProduct(o.productCode);
       lines.push([
-        o.id, fmtDate(o.orderDate), csvSafe(o.customer), csvSafe(product.name),
+        orderNumbersDisplay(o), fmtDate(o.orderDate), csvSafe(o.customer), csvSafe(product.name),
         o.qty, csvSafe(tailorNames(o.tailorIds)), fmtDateTime(o.startDateTime), fmtDateTime(o.estimatedCompletion), statusLabel(o.status)
       ].join(';'));
     });
@@ -1291,7 +1413,7 @@
         const product = findProduct(o.productCode);
         const left = ((o.startDateTime - minDate)/totalSpan)*100;
         const width = Math.max(((o.estimatedCompletion - o.startDateTime)/totalSpan)*100, 1.2);
-        return `<div class="order-bar ${o.status}" style="left:${left}%;width:${width}%;" title="${o.id} · ${product.name} · ${o.qty} pcs · ${statusLabel(o.status)}&#10;Mulai: ${fmtDateTime(o.startDateTime)}&#10;Estimasi: ${fmtDateTime(o.estimatedCompletion)}">${o.id}</div>`;
+        return `<div class="order-bar ${o.status}" style="left:${left}%;width:${width}%;" title="${orderNumbersDisplay(o)} · ${product.name} · ${o.qty} pcs · ${statusLabel(o.status)}&#10;Mulai: ${fmtDateTime(o.startDateTime)}&#10;Estimasi: ${fmtDateTime(o.estimatedCompletion)}">${orderNumbersDisplay(o)}</div>`;
       }).join('');
       const todayLine = (todayPct>=0 && todayPct<=100) ? `<div class="today-line" style="left:${todayPct}%;"></div>` : '';
       return `<div class="tailor-row">
