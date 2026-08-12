@@ -66,7 +66,7 @@
 
   /* ===== HEADER ===== */
   header.app-header{
-    background:linear-gradient(135deg,var(--olive-900),var(--olive-700) 70%);
+    background:linear-gradient(135deg,#232D18,#3F4E29 70%);
     color:#F4F2E6;
     padding:18px 28px;
     display:flex;
@@ -90,7 +90,7 @@
     cursor:pointer;transition:all .15s ease;white-space:nowrap;
   }
   nav.tabs button:hover{background:rgba(255,255,255,0.08);}
-  nav.tabs button.active{background:var(--gold-500);color:var(--olive-900);font-weight:600;}
+  nav.tabs button.active{background:var(--gold-500);color:#232D18;font-weight:600;}
 
   main{padding:26px 28px 60px;max-width:1360px;margin:0 auto;}
   section.view{display:none;animation:fadein .25s ease;}
@@ -160,8 +160,8 @@
     cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:7px;
   }
   .btn-primary{background:var(--olive-800);color:#F7F5E9;}
-  .btn-primary:hover{background:var(--olive-900);}
-  .btn-gold{background:var(--gold-500);color:var(--olive-900);}
+  .btn-primary:hover{background:#1B2410;}
+  .btn-gold{background:var(--gold-500);color:#232D18;}
   .btn-gold:hover{background:var(--gold-600);color:#fff;}
   .btn-ghost{background:transparent;border:1.5px solid var(--line);color:var(--ink-700);}
   .btn-ghost:hover{border-color:var(--olive-500);color:var(--olive-800);}
@@ -235,6 +235,9 @@
   @media (max-width:1000px){.master-grid{grid-template-columns:1fr;}}
 
   .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+  .pagination{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;flex-wrap:wrap;}
+  .pagination .page-indicator{font-size:12.5px;color:var(--ink-500);}
+  .pagination .btn:disabled{opacity:0.4;cursor:not-allowed;}
 
   footer{text-align:center;padding:26px;color:var(--ink-500);font-size:12px;}
 
@@ -260,6 +263,42 @@
   }
   .storage-note .dot{width:7px;height:7px;border-radius:50%;background:var(--success);flex-shrink:0;}
   .storage-note.off .dot{background:var(--ink-500);}
+
+  /* ===== NIGHT MODE ===== */
+  .theme-toggle{
+    background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);
+    color:#F4F2E6;width:38px;height:38px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;
+    transition:background .15s;
+  }
+  .theme-toggle:hover{background:rgba(255,255,255,0.22);}
+
+  html[data-theme="dark"]{
+    --bg:#181A12;
+    --surface:#22251A;
+    --olive-900:#EEEAD8;
+    --olive-200:#333827;
+    --ink-900:#EEEAD8;
+    --ink-700:#C6C2A9;
+    --ink-500:#8F8B72;
+    --line:#343924;
+    --danger-bg:#3A2620;
+    --success-bg:#1E3324;
+    --warning-bg:#3A2F16;
+    --info-bg:#1C2A3B;
+    --shadow:0 1px 2px rgba(0,0,0,0.5), 0 4px 18px rgba(0,0,0,0.4);
+  }
+  html[data-theme="dark"] input,
+  html[data-theme="dark"] select{ background:#20231A; }
+  html[data-theme="dark"] input:focus,
+  html[data-theme="dark"] select:focus{ background:#262A1C; }
+  html[data-theme="dark"] .checkbox-chip{ background:#20231A; }
+  html[data-theme="dark"] .badge.TidakAktif{ background:#2A2D1F; }
+  html[data-theme="dark"] thead th{ background:#1E2116; }
+  html[data-theme="dark"] tbody tr:hover{ background:#20231A; }
+  html[data-theme="dark"] .tailor-track{ background:#20231A; }
+  html[data-theme="dark"] .icon-btn{ background:#20231A; }
+  html[data-theme="dark"] .inline-form{ background:#1E2116; }
 </style>
 </head>
 <body>
@@ -284,6 +323,7 @@
     <button data-view="timeline">Timeline Penjahit</button>
     <button data-view="master">Master Data</button>
   </nav>
+  <button class="theme-toggle" id="themeToggle" title="Ganti mode terang/gelap" type="button">🌙</button>
 </header>
 
 <main>
@@ -480,7 +520,10 @@
       <div class="panel">
         <div class="toolbar">
           <h3 style="margin:0;">Master Penjahit</h3>
-          <button class="btn btn-gold btn-sm" id="btnAddTailor">+ Tambah Penjahit</button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-sm" id="btnTidyTailorIds" title="Urutkan ulang ID penjahit menjadi T001, T002, dst.">Rapikan ID</button>
+            <button class="btn btn-gold btn-sm" id="btnAddTailor">+ Tambah Penjahit</button>
+          </div>
         </div>
 
         <div class="inline-form hidden" id="tailorFormWrap">
@@ -539,6 +582,7 @@
             <tbody></tbody>
           </table>
         </div>
+        <div class="pagination" id="productPagination"></div>
       </div>
     </div>
   </section>
@@ -550,6 +594,32 @@
 <script>
 (function(){
   "use strict";
+
+  /* ============================================================
+     NIGHT MODE
+     Preferensi tersimpan di localStorage (aplikasi ini sudah berjalan
+     sebagai website sungguhan lewat Cloudflare, jadi localStorage aman
+     dipakai di sini). Kalau belum pernah diatur, ikuti preferensi
+     sistem/browser pengguna.
+  ============================================================ */
+  const THEME_KEY = 'jahitan-theme';
+  function applyTheme(theme){
+    document.documentElement.setAttribute('data-theme', theme);
+    const btn = document.getElementById('themeToggle');
+    if(btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+  }
+  function initTheme(){
+    let saved = null;
+    try{ saved = localStorage.getItem(THEME_KEY); }catch(e){ /* ignore */ }
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    applyTheme(saved || (prefersDark ? 'dark' : 'light'));
+  }
+  initTheme();
+  document.getElementById('themeToggle').addEventListener('click', ()=>{
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    try{ localStorage.setItem(THEME_KEY, next); }catch(e){ /* ignore */ }
+  });
 
   /* ============================================================
      STATE / MASTER DATA (dummy)
@@ -1237,6 +1307,9 @@
   /* ============================================================
      MASTER DATA VIEW
   ============================================================ */
+  const PRODUCTS_PER_PAGE = 8;
+  let productPage = 1;
+
   function renderMaster(){
     document.querySelector('#tailorTable tbody').innerHTML = state.tailors.map(t=>`
       <tr>
@@ -1248,7 +1321,18 @@
         </td>
       </tr>`).join('');
 
-    document.querySelector('#productTable tbody').innerHTML = state.products.map(p=>`
+    renderProductTable();
+  }
+
+  function renderProductTable(){
+    const totalPages = Math.max(1, Math.ceil(state.products.length / PRODUCTS_PER_PAGE));
+    if(productPage > totalPages) productPage = totalPages;
+    if(productPage < 1) productPage = 1;
+
+    const startIdx = (productPage-1) * PRODUCTS_PER_PAGE;
+    const pageItems = state.products.slice(startIdx, startIdx + PRODUCTS_PER_PAGE);
+
+    document.querySelector('#productTable tbody').innerHTML = pageItems.length ? pageItems.map(p=>`
       <tr>
         <td class="cell-strong">${p.name}</td>
         <td class="mono">${p.avgMinutes} menit</td>
@@ -1257,7 +1341,20 @@
           <button class="icon-btn" title="Edit" data-edit-product="${p.code}">✎</button>
           <button class="icon-btn danger" title="Hapus" data-del-product="${p.code}">🗑</button>
         </td>
-      </tr>`).join('');
+      </tr>`).join('') : `<tr><td colspan="4"><div class="empty-state">Belum ada produk.</div></td></tr>`;
+
+    const pagEl = document.getElementById('productPagination');
+    if(state.products.length <= PRODUCTS_PER_PAGE){
+      pagEl.innerHTML = '';
+      return;
+    }
+    pagEl.innerHTML = `
+      <button class="btn btn-ghost btn-sm" id="productPrevPage" ${productPage<=1?'disabled':''}>‹ Sebelumnya</button>
+      <span class="page-indicator">Halaman ${productPage} dari ${totalPages} &nbsp;(${state.products.length} produk)</span>
+      <button class="btn btn-ghost btn-sm" id="productNextPage" ${productPage>=totalPages?'disabled':''}>Berikutnya ›</button>
+    `;
+    document.getElementById('productPrevPage')?.addEventListener('click', ()=>{ productPage--; renderProductTable(); });
+    document.getElementById('productNextPage')?.addEventListener('click', ()=>{ productPage++; renderProductTable(); });
   }
 
   /* ---------- CRUD: PRODUK ---------- */
@@ -1319,6 +1416,7 @@
       state.products[idx] = data;
     } else {
       state.products.push(data);
+      productPage = Math.ceil(state.products.length / PRODUCTS_PER_PAGE);
     }
     closeProductForm();
     populateFormSelects();
@@ -1379,11 +1477,47 @@
   document.getElementById('btnAddTailor').addEventListener('click', ()=>openTailorForm(null));
   document.getElementById('tfCancelBtn').addEventListener('click', closeTailorForm);
 
+  // Merapikan ID yang sudah kadung acak (mis. dari versi lama yang
+  // memakai timestamp) menjadi T001, T002, dst. berurutan sesuai urutan
+  // tabel saat ini. Seluruh order yang mereferensikan ID lama otomatis
+  // ikut disesuaikan supaya tidak ada data yang "lepas".
+  document.getElementById('btnTidyTailorIds').addEventListener('click', async ()=>{
+    if(!confirm('Urutkan ulang ID semua penjahit menjadi T001, T002, dst.?\nSemua order yang sudah ada akan otomatis mengikuti ID baru ini, jadi tidak ada data yang hilang.')) return;
+    const mapping = {};
+    state.tailors.forEach((t,i)=>{
+      const newId = 'T' + String(i+1).padStart(3,'0');
+      mapping[t.id] = newId;
+      t.id = newId;
+    });
+    state.orders.forEach(o=>{
+      o.tailorIds = (o.tailorIds||[]).map(id=> mapping[id] || id);
+    });
+    populateFormSelects();
+    populateFilterSelects();
+    renderMaster();
+    renderOrderTable();
+    renderDashboard();
+    renderTimeline();
+    await persist();
+    alert('ID penjahit berhasil dirapikan.');
+  });
+
+  // ID sequential T001, T002, dst. — dicari dari ID tertinggi yang sudah
+  // ada supaya tidak pernah tabrakan meski ada penjahit yang dihapus.
+  function generateTailorId(){
+    let maxNum = 0;
+    state.tailors.forEach(t=>{
+      const m = /^T(\d+)$/.exec(t.id);
+      if(m) maxNum = Math.max(maxNum, parseInt(m[1],10));
+    });
+    return 'T' + String(maxNum+1).padStart(3,'0');
+  }
+
   tailorForm.addEventListener('submit', async (e)=>{
     e.preventDefault();
     const editing = tfEditId.value;
     const data = {
-      id: editing || ('T' + String(Date.now()).slice(-6)),
+      id: editing || generateTailorId(),
       name: document.getElementById('tfName').value.trim()
     };
     if(editing){
